@@ -11,13 +11,6 @@ export enum UserStatus {
   BLOCKED = "BLOCKED",
 }
 
-export enum NotificationType {
-  NORMAL = "NORMAL",
-  URGENT = "URGENT",
-  PROMOTIONAL = "PROMOTIONAL",
-  SYSTEM = "SYSTEM",
-}
-
 export interface IUser extends Document {
   _id: string;
   fullName: string;
@@ -28,7 +21,6 @@ export interface IUser extends Document {
   role: UserRole;
   status: UserStatus;
   isDeleted: boolean;
-  fcmToken?: string;
   resetPasswordOtp?: string;
   resetPasswordOtpExpiry?: Date;
   createdAt: Date;
@@ -76,9 +68,6 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
-    fcmToken: {
-      type: String,
-    },
     resetPasswordOtp: {
       type: String,
       select: false,
@@ -90,7 +79,7 @@ const UserSchema = new Schema<IUser>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for better query performance (email index created by unique: true)

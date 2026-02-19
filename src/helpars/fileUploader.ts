@@ -60,7 +60,7 @@ const userMutipleFiles = upload.fields([
 // ✅ Enhanced Cloudinary Upload with better file handling
 const uploadToCloudinary = async (
   file: Express.Multer.File,
-  folder: string = "uploads"
+  folder: string = "uploads",
 ): Promise<{ Location: string; public_id: string }> => {
   if (!file) {
     throw new Error("File is required for uploading.");
@@ -68,17 +68,17 @@ const uploadToCloudinary = async (
 
   return new Promise((resolve, reject) => {
     // Generate unique filename
-    const uniqueFilename = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    
+    const uniqueFilename = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: folder,
         resource_type: "auto", // Supports images, videos, etc.
-        public_id: uniqueFilename.split('.')[0], // Remove extension for public_id
+        public_id: uniqueFilename.split(".")[0], // Remove extension for public_id
         unique_filename: true,
         overwrite: false,
         quality: "auto",
-        fetch_format: "auto"
+        fetch_format: "auto",
       },
       (error, result) => {
         if (error) {
@@ -91,7 +91,7 @@ const uploadToCloudinary = async (
           Location: result?.secure_url || "", // Cloudinary URL
           public_id: result?.public_id || "",
         });
-      }
+      },
     );
 
     // Convert buffer to stream and upload

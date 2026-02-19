@@ -31,7 +31,7 @@ const auth = (...roles: string[]) => {
   return async (
     req: Request & { user?: JwtPayload },
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) => {
     try {
       const token = extractToken(req);
@@ -40,7 +40,10 @@ const auth = (...roles: string[]) => {
         throw new ApiError(httpStatus.UNAUTHORIZED, "Authentication required");
       }
 
-      const decoded = jwtHelpers.verifyToken(token, config.jwt.jwt_secret as string);
+      const decoded = jwtHelpers.verifyToken(
+        token,
+        config.jwt.jwt_secret as string,
+      );
 
       // Verify user exists and is active
       const user = await User.findById(decoded.id).select("status role").lean();

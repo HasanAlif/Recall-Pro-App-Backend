@@ -10,7 +10,6 @@ export interface IUser {
   role: UserRole;
   status: UserStatus;
   isDeleted: boolean;
-  fcmToken?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

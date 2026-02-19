@@ -8,7 +8,7 @@ import crypto from "crypto";
  * @returns {number, Date} - The generated OTP and its expiration time.
  */
 export const generateOTP = (
-  validTime: number = 5
+  validTime: number = 5,
 ): { otp: number; otpExpires: Date } => {
   const otp = Number(crypto.randomInt(1000, 9999));
 

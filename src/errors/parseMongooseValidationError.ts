@@ -13,29 +13,29 @@ const parseMongooseValidationError = (error: any) => {
           break;
         case "min":
           errorMessages.push(
-            `${field} must be at least ${fieldError.properties.min} characters`
+            `${field} must be at least ${fieldError.properties.min} characters`,
           );
           break;
         case "max":
           errorMessages.push(
-            `${field} must be at most ${fieldError.properties.max} characters`
+            `${field} must be at most ${fieldError.properties.max} characters`,
           );
           break;
         case "minlength":
           errorMessages.push(
-            `${field} must be at least ${fieldError.properties.minlength} characters long`
+            `${field} must be at least ${fieldError.properties.minlength} characters long`,
           );
           break;
         case "maxlength":
           errorMessages.push(
-            `${field} must be at most ${fieldError.properties.maxlength} characters long`
+            `${field} must be at most ${fieldError.properties.maxlength} characters long`,
           );
           break;
         case "enum":
           errorMessages.push(
             `${field} must be one of: ${fieldError.properties.enumValues.join(
-              ", "
-            )}`
+              ", ",
+            )}`,
           );
           break;
         case "unique":

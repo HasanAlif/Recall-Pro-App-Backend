@@ -4,7 +4,7 @@ import config from "../config";
 const emailSender = async (
   to: string,
   html: string,
-  subject: string
+  subject: string,
 ): Promise<void> => {
   if (!config.emailSender.email || !config.emailSender.app_pass) {
     console.warn("Email credentials not configured. Email not sent.");

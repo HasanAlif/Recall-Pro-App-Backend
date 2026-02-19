@@ -1,6 +1,5 @@
 import express from "express";
 import { authRoutes } from "../modules/auth/auth.routes";
-import { notificationsRoute } from "../modules/notification/notification.routes";
 import { userRoutes } from "../modules/user/user.route";
 
 const router = express.Router();
@@ -13,10 +12,6 @@ const moduleRoutes = [
   {
     path: "/auth",
     route: authRoutes,
-  },
-  {
-    path: "/notifications",
-    route: notificationsRoute,
   },
 ];
 

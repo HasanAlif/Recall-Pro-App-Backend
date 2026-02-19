@@ -54,7 +54,11 @@ const getMyProfile = catchAsync(async (req: Request, res: Response) => {
 // Change password
 const changePassword = catchAsync(async (req: Request, res: Response) => {
   const { oldPassword, newPassword } = req.body;
-  const result = await authService.changePassword(req.user.id, newPassword, oldPassword);
+  const result = await authService.changePassword(
+    req.user.id,
+    newPassword,
+    oldPassword,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -86,20 +90,27 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
 });
 
 // Verify OTP
-const verifyForgotPasswordOtp = catchAsync(async (req: Request, res: Response) => {
-  const result = await authService.verifyForgotPasswordOtp(req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "OTP verified successfully",
-    data: result,
-  });
-});
+const verifyForgotPasswordOtp = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await authService.verifyForgotPasswordOtp(req.body);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "OTP verified successfully",
+      data: result,
+    });
+  },
+);
 
 // Reset password
 const resetPassword = catchAsync(async (req: Request, res: Response) => {
   const { email, newPassword, confirmPassword, otp } = req.body;
-  const result = await authService.resetPassword(email, newPassword, confirmPassword, otp);
+  const result = await authService.resetPassword(
+    email,
+    newPassword,
+    confirmPassword,
+    otp,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
