@@ -22,7 +22,7 @@ const emailSender = async (
   });
 
   await transporter.sendMail({
-    from: `"${config.site_name || "Saldo"}" <${config.emailSender.email}>`,
+    from: `"${config.site_name || "Recall Pro"}" <${config.emailSender.email}>`,
     to,
     subject,
     html,

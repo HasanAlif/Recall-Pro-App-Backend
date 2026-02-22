@@ -19,10 +19,16 @@ export default {
   },
   reset_pass_link: process.env.RESET_PASS_LINK,
   emailSender: {
-    email: process.env.EMAIL,
-    app_pass: process.env.APP_PASS,
+    email: process.env.MAIL_EMAIL,
+    app_pass: process.env.MAIL_APP_PASS,
   },
 
   site_name: process.env.WEBSITE_NAME,
   contact_mail: process.env.CONTACT_MAIL,
+  frontendUrl: process.env.FRONTEND_URL,
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+  },
 };

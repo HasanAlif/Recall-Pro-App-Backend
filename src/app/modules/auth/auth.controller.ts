@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
+import config from "../../../config";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { authService } from "./auth.service";
@@ -119,6 +120,42 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Get Google Auth URL
+const getGoogleAuthUrl = catchAsync(async (req: Request, res: Response) => {
+  const result = authService.getGoogleAuthUrl();
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Google auth URL generated",
+    data: result,
+  });
+});
+
+// Google OAuth Callback
+const googleCallback = catchAsync(async (req: Request, res: Response) => {
+  const { code } = req.query;
+
+  if (!code || typeof code !== "string") {
+    return res.redirect(
+      `${config.frontendUrl}/auth/error?message=Invalid authorization code`,
+    );
+  }
+
+  const result = await authService.googleCallback(code);
+
+  // Set cookie
+  res.cookie("token", result.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+
+  // Redirect to frontend with token
+  res.redirect(`${config.frontendUrl}/auth/callback?token=${result.token}`);
+});
+
 export const AuthController = {
   loginUser,
   logoutUser,
@@ -128,4 +165,6 @@ export const AuthController = {
   resetPassword,
   resendOtp,
   verifyForgotPasswordOtp,
+  getGoogleAuthUrl,
+  googleCallback,
 };

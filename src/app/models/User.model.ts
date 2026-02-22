@@ -11,6 +11,11 @@ export enum UserStatus {
   BLOCKED = "BLOCKED",
 }
 
+export enum AuthProvider {
+  LOCAL = "LOCAL",
+  GOOGLE = "GOOGLE",
+}
+
 export interface IUser extends Document {
   _id: string;
   fullName: string;
@@ -23,6 +28,11 @@ export interface IUser extends Document {
   isDeleted: boolean;
   resetPasswordOtp?: string;
   resetPasswordOtpExpiry?: Date;
+  isVerified: boolean;
+  verificationOtp?: string;
+  verificationOtpExpiry?: Date;
+  googleId?: string;
+  authProvider?: AuthProvider;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +85,27 @@ const UserSchema = new Schema<IUser>(
     resetPasswordOtpExpiry: {
       type: Date,
       select: false,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationOtp: {
+      type: String,
+      select: false,
+    },
+    verificationOtpExpiry: {
+      type: Date,
+      select: false,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+    },
+    authProvider: {
+      type: String,
+      enum: Object.values(AuthProvider),
+      default: AuthProvider.LOCAL,
     },
   },
   {

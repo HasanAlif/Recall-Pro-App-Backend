@@ -1,14 +1,27 @@
 import * as bcrypt from "bcrypt";
 import crypto from "crypto";
 import httpStatus from "http-status";
+import { OAuth2Client } from "google-auth-library";
 import config from "../../../config";
 import ApiError from "../../../errors/ApiErrors";
 import { jwtHelpers } from "../../../helpars/jwtHelpers";
 import emailSender from "../../../shared/emailSender";
-import { User } from "../../models";
+import { PASSWORD_RESET_TEMPLATE } from "../../../utils/Template";
+import { AuthProvider, User } from "../../models";
+
+// Initialize Google OAuth client
+const googleClient = new OAuth2Client(
+  config.google.clientId,
+  config.google.clientSecret,
+  config.google.callbackUrl,
+);
 
 // User login
-const loginUser = async (payload: { email: string; password: string }) => {
+const loginUser = async (payload: {
+  email: string;
+  password: string;
+  fcmToken?: string;
+}) => {
   const userData = await User.findOne({ email: payload.email })
     .select("+password")
     .lean();
@@ -24,12 +37,33 @@ const loginUser = async (payload: { email: string; password: string }) => {
     );
   }
 
+  // Check if user is verified
+  if (!userData.isVerified) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Please verify your email before logging in",
+    );
+  }
+
+  // Check if user is Google-only (no password)
+  if (!userData.password) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "This account uses Google sign-in. Please continue with Google.",
+    );
+  }
+
   const isPasswordValid = await bcrypt.compare(
     payload.password,
     userData.password,
   );
   if (!isPasswordValid) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid email or password");
+  }
+
+  // Update FCM token if provided
+  if (payload.fcmToken) {
+    await User.findByIdAndUpdate(userData._id, { fcmToken: payload.fcmToken });
   }
 
   const accessToken = jwtHelpers.generateToken(
@@ -56,7 +90,7 @@ const loginUser = async (payload: { email: string; password: string }) => {
 const getMyProfile = async (userId: string) => {
   const userProfile = await User.findById(userId)
     .select(
-      "_id fullName email mobileNumber profilePicture role status createdAt",
+      "_id fullName email mobileNumber profilePicture role status premiumPlan premiumPlanExpiry isEnjoyedTrial country currency language timezone monthStartDate createdAt",
     )
     .lean();
 
@@ -77,6 +111,14 @@ const changePassword = async (
 
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Check if user has a password (Google users might not)
+  if (!user.password) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Cannot change password for Google sign-in accounts. Please set a password first.",
+    );
   }
 
   const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
@@ -115,21 +157,11 @@ const forgotPassword = async (payload: { email: string }) => {
 
   await emailSender(
     payload.email,
-    `
-    <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto;">
-      <h2 style="color: #333;">Password Reset OTP</h2>
-      <p>Your OTP for password reset is:</p>
-      <div style="background: #f5f5f5; padding: 15px; text-align: center; font-size: 32px; letter-spacing: 5px; font-weight: bold; color: #333; border-radius: 8px;">
-        ${otp}
-      </div>
-      <p style="margin-top: 20px; color: #666;">This OTP will expire in 15 minutes.</p>
-      <p style="color: #666;">If you didn't request this, please ignore this email.</p>
-    </div>
-    `,
-    "Password Reset OTP",
+    PASSWORD_RESET_TEMPLATE(otp),
+    "Password Reset OTP - Recall Pro",
   );
 
-  return { message: "OTP sent to your email" };
+  return { message: "OTP sent to your email", otp }; // Return OTP for testing purposes only
 };
 
 // Resend OTP
@@ -153,20 +185,11 @@ const resendOtp = async (email: string) => {
 
   await emailSender(
     email,
-    `
-    <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto;">
-      <h2 style="color: #333;">Password Reset OTP</h2>
-      <p>Your new OTP for password reset is:</p>
-      <div style="background: #f5f5f5; padding: 15px; text-align: center; font-size: 32px; letter-spacing: 5px; font-weight: bold; color: #333; border-radius: 8px;">
-        ${otp}
-      </div>
-      <p style="margin-top: 20px; color: #666;">This OTP will expire in 15 minutes.</p>
-    </div>
-    `,
-    "Password Reset OTP",
+    PASSWORD_RESET_TEMPLATE(otp),
+    "Password Reset OTP - Recall Pro",
   );
 
-  return { message: "OTP resent to your email" };
+  return { message: "OTP resent to your email", otp }; // Return OTP for testing purposes only
 };
 
 // Verify OTP
@@ -236,6 +259,108 @@ const resetPassword = async (
   return { message: "Password reset successfully" };
 };
 
+// Get Google OAuth URL
+const getGoogleAuthUrl = () => {
+  const scopes = [
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+  ];
+
+  const authUrl = googleClient.generateAuthUrl({
+    access_type: "offline",
+    scope: scopes,
+    prompt: "consent",
+  });
+
+  return { authUrl };
+};
+
+// Handle Google OAuth callback
+const googleCallback = async (code: string) => {
+  // Exchange code for tokens
+  const { tokens } = await googleClient.getToken(code);
+  googleClient.setCredentials(tokens);
+
+  // Get user info from Google
+  const ticket = await googleClient.verifyIdToken({
+    idToken: tokens.id_token as string,
+    audience: config.google.clientId,
+  });
+
+  const payload = ticket.getPayload();
+
+  if (!payload || !payload.email) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Failed to get user info from Google",
+    );
+  }
+
+  const { sub: googleId, email, name, picture } = payload;
+
+  // Check if user exists with this googleId
+  let user = await User.findOne({ googleId }).lean();
+
+  if (!user) {
+    // Check if user exists with this email (local account)
+    user = await User.findOne({ email }).lean();
+
+    if (user) {
+      // Link Google account to existing local account
+      await User.findByIdAndUpdate(user._id, {
+        googleId,
+        authProvider: AuthProvider.GOOGLE,
+        profilePicture: user.profilePicture || picture,
+      });
+      user = await User.findById(user._id).lean();
+    } else {
+      // Create new user with Google account
+      const newUser = await User.create({
+        fullName: name || "Google User",
+        email,
+        googleId,
+        profilePicture: picture,
+        authProvider: AuthProvider.GOOGLE,
+      });
+      user = await User.findById(newUser._id).lean();
+    }
+  }
+
+  if (!user) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to create user",
+    );
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Your account is inactive or blocked",
+    );
+  }
+
+  // Generate JWT token
+  const accessToken = jwtHelpers.generateToken(
+    {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    },
+    config.jwt.jwt_secret as string,
+    config.jwt.expires_in as string,
+  );
+
+  const {
+    password,
+    resetPasswordOtp,
+    resetPasswordOtpExpiry,
+    ...userWithoutSensitive
+  } = user as any;
+
+  return { token: accessToken, user: userWithoutSensitive };
+};
+
 export const authService = {
   loginUser,
   getMyProfile,
@@ -244,4 +369,6 @@ export const authService = {
   resendOtp,
   verifyForgotPasswordOtp,
   resetPassword,
+  getGoogleAuthUrl,
+  googleCallback,
 };

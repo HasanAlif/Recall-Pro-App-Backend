@@ -31,7 +31,7 @@ mongoose.connection.on("disconnected", () => {
 });
 
 // async function initiateSuperAdmin() {
-//   const adminEmail = "admin@saldo.com";
+//   const adminEmail = "admin@recallpro.com";
 
 //   const existingAdmin = await User.findOne({ email: adminEmail });
 //   if (existingAdmin) return;

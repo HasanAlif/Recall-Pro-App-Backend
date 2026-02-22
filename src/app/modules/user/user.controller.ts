@@ -6,7 +6,7 @@ import sendResponse from "../../../shared/sendResponse";
 import { userFilterableFields } from "./user.costant";
 import { userService } from "./user.service";
 
-// Register new user
+// Register new user - sends OTP
 const createUser = catchAsync(async (req: Request, res: Response) => {
   const { fullName, email, mobileNumber, password } = req.body;
   const result = await userService.createUserIntoDb({
@@ -16,22 +16,52 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     password,
   });
 
-  // Set token in cookie
-  res.cookie("token", result.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: "/",
-  });
-
   sendResponse(res, {
-    statusCode: httpStatus.CREATED,
+    statusCode: httpStatus.OK,
     success: true,
-    message: "User registered successfully!",
+    message: "OTP sent to your email. Please verify to complete registration.",
     data: result,
   });
 });
+
+// Verify registration OTP
+const verifyRegistrationOtp = catchAsync(
+  async (req: Request, res: Response) => {
+    const { email, otp } = req.body;
+    const result = await userService.verifyRegistrationOtp({ email, otp });
+
+    // Set token in cookie after successful verification
+    res.cookie("token", result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+
+    sendResponse(res, {
+      statusCode: httpStatus.CREATED,
+      success: true,
+      message: "Email verified and registration completed successfully!",
+      data: result,
+    });
+  },
+);
+
+// Resend registration OTP
+const resendRegistrationOtp = catchAsync(
+  async (req: Request, res: Response) => {
+    const { email } = req.body;
+    const result = await userService.resendRegistrationOtp(email);
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "OTP resent to your email",
+      data: result,
+    });
+  },
+);
 
 // Get all users
 const getUsers = catchAsync(async (req: Request, res: Response) => {
@@ -108,6 +138,8 @@ const deleteMe = catchAsync(async (req: Request, res: Response) => {
 
 export const userController = {
   createUser,
+  verifyRegistrationOtp,
+  resendRegistrationOtp,
   getUsers,
   updateProfile,
   updateUser,

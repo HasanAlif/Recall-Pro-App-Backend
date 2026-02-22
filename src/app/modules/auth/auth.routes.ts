@@ -56,4 +56,10 @@ router.post(
   AuthController.resetPassword,
 );
 
+// Google OAuth - Get auth URL
+router.get("/google", AuthController.getGoogleAuthUrl);
+
+// Google OAuth - Callback
+router.get("/google/callback", AuthController.googleCallback);
+
 export const authRoutes = router;

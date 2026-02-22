@@ -392,3 +392,75 @@ export const LANDING_PAGE_TEMPLATE = `
 </body>
 </html>
 `;
+
+export const PASSWORD_RESET_TEMPLATE = (otp: string) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset OTP</title>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 0; }
+        .container { max-width: 480px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #e8578a, #9b59b6); padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .body { padding: 32px; text-align: center; }
+        .otp-code { display: inline-block; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #e8578a; background: #fef0f5; padding: 16px 32px; border-radius: 8px; margin: 24px 0; }
+        .body p { color: #555; font-size: 15px; line-height: 1.6; margin: 8px 0; }
+        .footer { text-align: center; padding: 20px 32px; background: #fafafa; color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Password Reset</h1>
+        </div>
+        <div class="body">
+            <p>You requested a password reset. Use the OTP below to proceed:</p>
+            <div class="otp-code">${otp}</div>
+            <p>If you did not request this, please ignore this email.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; Recall Pro — Salon Management</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
+export const EMAIL_VERIFICATION_TEMPLATE = (otp: string) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification OTP</title>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 0; }
+        .container { max-width: 480px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #e8578a, #9b59b6); padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .body { padding: 32px; text-align: center; }
+        .otp-code { display: inline-block; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #e8578a; background: #fef0f5; padding: 16px 32px; border-radius: 8px; margin: 24px 0; }
+        .body p { color: #555; font-size: 15px; line-height: 1.6; margin: 8px 0; }
+        .footer { text-align: center; padding: 20px 32px; background: #fafafa; color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Verify Your Email</h1>
+        </div>
+        <div class="body">
+            <p>Welcome to <strong>Recall Pro</strong>! Use the OTP below to verify your email address:</p>
+            <div class="otp-code">${otp}</div>
+            <p>If you did not create an account, please ignore this email.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; Recall Pro — Salon Management</p>
+        </div>
+    </div>
+</body>
+</html>
+`;

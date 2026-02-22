@@ -15,6 +15,20 @@ router.post(
   userController.createUser,
 );
 
+// Verify registration OTP (no auth required)
+router.post(
+  "/verify-registration",
+  validateRequest(UserValidation.VerifyRegistrationOtpSchema),
+  userController.verifyRegistrationOtp,
+);
+
+// Resend registration OTP (no auth required)
+router.post(
+  "/resend-registration-otp",
+  validateRequest(UserValidation.ResendRegistrationOtpSchema),
+  userController.resendRegistrationOtp,
+);
+
 // Update profile image
 router.put(
   "/profile-image",
