@@ -1,7 +1,10 @@
 import mongoose from "mongoose";
+import dns from "dns";
 import config from "../config";
 import { User, UserRole } from "../app/models";
 import bcrypt from "bcrypt";
+
+dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
 
 async function connectMongoDB() {
   try {
