@@ -1,0 +1,166 @@
+import { Request } from "express";
+import httpStatus from "http-status";
+import { v2 as cloudinary } from "cloudinary";
+import { Client } from "./client.model";
+import { clientValidation } from "./client.validation";
+import ApiError from "../../../errors/ApiErrors";
+import { fileUploader } from "../../../helpars/fileUploader";
+import { paginationHelper } from "../../../helpars/paginationHelper";
+import { IPaginationOptions } from "../../../interfaces/paginations";
+
+// Extract Cloudinary public_id from URL
+const getPublicIdFromUrl = (url: string): string | null => {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+  return match ? match[1] : null;
+};
+
+// Delete image from Cloudinary by URL (best-effort)
+const deleteFromCloudinary = (url: string | undefined) => {
+  if (!url) return;
+  const publicId = getPublicIdFromUrl(url);
+  if (publicId) {
+    cloudinary.uploader.destroy(publicId).catch(() => {});
+  }
+};
+
+// Create a new client
+const createClient = async (req: Request) => {
+  const userId = req.user.id;
+
+  const validatedData = clientValidation.createSchema.parse(req.body);
+
+  const clientData: Record<string, any> = {
+    userId,
+    ...validatedData,
+  };
+
+  // Upload picture to Cloudinary if provided
+  if (req.file) {
+    const uploaded = await fileUploader.uploadToCloudinary(
+      req.file,
+      "client-pictures",
+    );
+    clientData.picture = uploaded.Location;
+  }
+
+  const result = await Client.create(clientData);
+  return result.toObject();
+};
+
+// Get all clients for the authenticated user
+const getClients = async (
+  userId: string,
+  params: { searchTerm?: string },
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip, sortBy, sortOrder } =
+    paginationHelper.calculatePagination(options);
+
+  const conditions: any[] = [{ userId }];
+
+  if (params.searchTerm) {
+    conditions.push({
+      $or: [
+        { fullName: { $regex: params.searchTerm, $options: "i" } },
+        { email: { $regex: params.searchTerm, $options: "i" } },
+        { phoneNumber: { $regex: params.searchTerm, $options: "i" } },
+      ],
+    });
+  }
+
+  const whereConditions = { $and: conditions };
+
+  const sortConditions: Record<string, 1 | -1> = {};
+  sortConditions[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+  const [data, total] = await Promise.all([
+    Client.find(whereConditions)
+      .sort(sortConditions)
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Client.countDocuments(whereConditions),
+  ]);
+
+  return {
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    data,
+  };
+};
+
+// Get a single client by ID
+const getClientById = async (clientId: string, userId: string) => {
+  const client = await Client.findOne({ _id: clientId, userId }).lean();
+
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Client not found");
+  }
+
+  return client;
+};
+
+// Update a client
+const updateClient = async (req: Request, clientId: string) => {
+  const userId = req.user.id;
+
+  const existingClient = await Client.findOne({
+    _id: clientId,
+    userId,
+  }).lean();
+
+  if (!existingClient) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Client not found");
+  }
+
+  const updateData: Record<string, any> = {};
+
+  const validatedData = clientValidation.updateSchema.parse(req.body);
+  Object.assign(updateData, validatedData);
+
+  // Handle picture: upload new first, then cleanup old
+  if (req.file) {
+    const uploaded = await fileUploader.uploadToCloudinary(
+      req.file,
+      "client-pictures",
+    );
+    updateData.picture = uploaded.Location;
+
+    // Cleanup old picture from Cloudinary
+    deleteFromCloudinary(existingClient.picture);
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "No data provided for update");
+  }
+
+  const result = await Client.findByIdAndUpdate(clientId, updateData, {
+    new: true,
+  }).lean();
+
+  return result;
+};
+
+// Delete a client
+const deleteClient = async (clientId: string, userId: string) => {
+  const client = await Client.findOneAndDelete({
+    _id: clientId,
+    userId,
+  }).lean();
+
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Client not found");
+  }
+
+  // Cleanup picture from Cloudinary
+  deleteFromCloudinary(client.picture);
+
+  return null;
+};
+
+export const clientService = {
+  createClient,
+  getClients,
+  getClientById,
+  updateClient,
+  deleteClient,
+};
