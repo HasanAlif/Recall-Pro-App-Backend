@@ -5,6 +5,7 @@ export interface IClientVisit extends Document {
   clientId: Types.ObjectId;
   serviceType?: string;
   photos?: string[];
+  videos?: string[];
   serviceNotes?: string;
   personalNotes?: string;
   duration?: number;
@@ -28,6 +29,10 @@ const ClientVisitSchema = new Schema<IClientVisit>(
       trim: true,
     },
     photos: {
+      type: [String],
+      default: [],
+    },
+    videos: {
       type: [String],
       default: [],
     },

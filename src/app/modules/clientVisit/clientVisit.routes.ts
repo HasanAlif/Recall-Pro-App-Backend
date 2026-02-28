@@ -5,9 +5,12 @@ import { fileUploader } from "../../../helpars/fileUploader";
 
 const router = express.Router();
 
-const uploadPhotos = fileUploader.upload.array("photos", 15);
+const uploadPhotosAndVideos = fileUploader.upload.fields([
+  { name: "photos", maxCount: 15 },
+  { name: "videos", maxCount: 5 },
+]);
 
-router.post("/", auth(), uploadPhotos, clientVisitController.create);
+router.post("/", auth(), uploadPhotosAndVideos, clientVisitController.create);
 
 router.get("/", auth(), clientVisitController.getAll);
 

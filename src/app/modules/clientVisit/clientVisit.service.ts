@@ -25,14 +25,28 @@ const createVisit = async (req: Request) => {
 
   const visitData: Record<string, any> = { ...validatedData };
 
-  const files = req.files as Express.Multer.File[] | undefined;
-  if (files && files.length > 0) {
-    const uploadResults = await Promise.all(
-      files.map((file) =>
+  const files = req.files as
+    | { photos?: Express.Multer.File[]; videos?: Express.Multer.File[] }
+    | undefined;
+
+  // Upload photos to Cloudinary
+  if (files?.photos && files.photos.length > 0) {
+    const photoResults = await Promise.all(
+      files.photos.map((file) =>
         fileUploader.uploadToCloudinary(file, "visit-photos"),
       ),
     );
-    visitData.photos = uploadResults.map((r) => r.Location);
+    visitData.photos = photoResults.map((r) => r.Location);
+  }
+
+  // Upload videos to Google Cloud Storage
+  if (files?.videos && files.videos.length > 0) {
+    const videoResults = await Promise.all(
+      files.videos.map((file) =>
+        fileUploader.uploadVideoToGCS(file, "visit-videos"),
+      ),
+    );
+    visitData.videos = videoResults.map((r) => r.Location);
   }
 
   const result = await ClientVisit.create(visitData);
