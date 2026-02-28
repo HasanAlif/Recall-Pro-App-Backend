@@ -31,4 +31,9 @@ export default {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackUrl: process.env.GOOGLE_CALLBACK_URL,
   },
+  gcs: {
+    bucketName: process.env.GCS_BUCKET_NAME,
+    projectId: process.env.GCS_PROJECT_ID,
+    keyFile: process.env.GCS_KEY_FILE || "google-cloud-key.json",
+  },
 };

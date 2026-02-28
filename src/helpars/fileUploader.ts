@@ -8,9 +8,21 @@ import {
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import streamifier from "streamifier";
+import { Storage } from "@google-cloud/storage";
+import path from "path";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// Configure Google Cloud Storage
+const gcsStorage = new Storage({
+  projectId: process.env.GCS_PROJECT_ID,
+  keyFilename: path.join(
+    process.cwd(),
+    process.env.GCS_KEY_FILE || "google-cloud-key.json",
+  ),
+});
+const gcsBucket = gcsStorage.bucket(process.env.GCS_BUCKET_NAME || "");
 
 // Configure DigitalOcean Spaces
 const s3Client = new S3Client({
@@ -141,6 +153,156 @@ const uploadGeneralFile = async (file: Express.Multer.File) => {
   return uploadToCloudinary(file, "user-files");
 };
 
+// ✅ Upload video to Google Cloud Storage
+const uploadVideoToGCS = async (
+  file: Express.Multer.File,
+  folder: string = "videos",
+): Promise<{ Location: string; fileName: string }> => {
+  if (!file) {
+    throw new Error("File is required for uploading.");
+  }
+
+  const allowedMimeTypes = [
+    "video/mp4",
+    "video/mpeg",
+    "video/quicktime",
+    "video/x-msvideo",
+    "video/webm",
+    "video/x-matroska",
+  ];
+
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    throw new Error(
+      `Invalid video format: ${file.mimetype}. Allowed: mp4, mpeg, mov, avi, webm, mkv`,
+    );
+  }
+
+  const uniqueFileName = `${folder}/${Date.now()}_${uuidv4()}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+  const blob = gcsBucket.file(uniqueFileName);
+
+  return new Promise((resolve, reject) => {
+    const blobStream = blob.createWriteStream({
+      resumable: true,
+      contentType: file.mimetype,
+      metadata: {
+        cacheControl: "public, max-age=31536000",
+      },
+    });
+
+    blobStream.on("error", (error) => {
+      console.error("Error uploading video to GCS:", error);
+      reject(error);
+    });
+
+    blobStream.on("finish", async () => {
+      // Make the file publicly accessible (optional — remove if using signed URLs)
+      try {
+        await blob.makePublic();
+      } catch (err) {
+        console.warn(
+          "Could not make file public. Bucket may have uniform access control.",
+        );
+      }
+
+      const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${uniqueFileName}`;
+      resolve({
+        Location: publicUrl,
+        fileName: uniqueFileName,
+      });
+    });
+
+    blobStream.end(file.buffer);
+  });
+};
+
+// ✅ Upload any file to Google Cloud Storage (images, docs, etc.)
+const uploadToGCS = async (
+  file: Express.Multer.File,
+  folder: string = "uploads",
+): Promise<{ Location: string; fileName: string }> => {
+  if (!file) {
+    throw new Error("File is required for uploading.");
+  }
+
+  const uniqueFileName = `${folder}/${Date.now()}_${uuidv4()}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+  const blob = gcsBucket.file(uniqueFileName);
+
+  return new Promise((resolve, reject) => {
+    const blobStream = blob.createWriteStream({
+      resumable: true,
+      contentType: file.mimetype,
+      metadata: {
+        cacheControl: "public, max-age=31536000",
+      },
+    });
+
+    blobStream.on("error", (error) => {
+      console.error("Error uploading file to GCS:", error);
+      reject(error);
+    });
+
+    blobStream.on("finish", async () => {
+      try {
+        await blob.makePublic();
+      } catch (err) {
+        console.warn(
+          "Could not make file public. Bucket may have uniform access control.",
+        );
+      }
+
+      const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${uniqueFileName}`;
+      resolve({
+        Location: publicUrl,
+        fileName: uniqueFileName,
+      });
+    });
+
+    blobStream.end(file.buffer);
+  });
+};
+
+// Multer middleware for video uploads (max 100MB)
+const uploadVideo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  fileFilter: (_req, file, cb) => {
+    const allowedMimeTypes = [
+      "video/mp4",
+      "video/mpeg",
+      "video/quicktime",
+      "video/x-msvideo",
+      "video/webm",
+      "video/x-matroska",
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid video format: ${file.mimetype}`));
+    }
+  },
+}).single("video");
+
+// Multer middleware for multiple video uploads
+const uploadMultipleVideos = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedMimeTypes = [
+      "video/mp4",
+      "video/mpeg",
+      "video/quicktime",
+      "video/x-msvideo",
+      "video/webm",
+      "video/x-matroska",
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid video format: ${file.mimetype}`));
+    }
+  },
+}).fields([{ name: "videos", maxCount: 5 }]);
+
 // ✅ No Name Changes, Just Fixes
 export const fileUploader = {
   upload,
@@ -154,4 +316,8 @@ export const fileUploader = {
   uploadToCloudinary,
   uploadProfileImage,
   uploadGeneralFile,
+  uploadVideoToGCS,
+  uploadToGCS,
+  uploadVideo,
+  uploadMultipleVideos,
 };
