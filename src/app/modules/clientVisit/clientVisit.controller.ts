@@ -28,7 +28,10 @@ const getAll = catchAsync(async (req: Request, res: Response) => {
     success: true,
     message: "Visits retrieved successfully!",
     meta: result.meta,
-    data: result.data,
+    data: {
+      clientInfo: result.clientInfo,
+      visits: result.data,
+    },
   });
 });
 

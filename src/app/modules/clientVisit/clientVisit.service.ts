@@ -1,5 +1,6 @@
 import { Request } from "express";
 import httpStatus from "http-status";
+import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import { ClientVisit } from "./clientVisit.model";
 import { Client } from "../client/client.model";
@@ -62,7 +63,7 @@ const getVisits = async (
     throw new ApiError(httpStatus.BAD_REQUEST, "Client ID is required");
   }
 
-  await verifyClientOwnership(params.clientId, userId);
+  const client = await verifyClientOwnership(params.clientId, userId);
 
   const { page, limit, skip, sortBy, sortOrder } =
     paginationHelper.calculatePagination(options);
@@ -72,17 +73,53 @@ const getVisits = async (
   const sortConditions: Record<string, 1 | -1> = {};
   sortConditions[sortBy] = sortOrder === "desc" ? -1 : 1;
 
-  const [data, total] = await Promise.all([
+  const [data, total, aggregation] = await Promise.all([
     ClientVisit.find(whereConditions)
+      .select("_id clientId date serviceType serviceNotes photos")
       .sort(sortConditions)
       .skip(skip)
       .limit(limit)
       .lean(),
     ClientVisit.countDocuments(whereConditions),
+    ClientVisit.aggregate([
+      {
+        $match: {
+          clientId: new mongoose.Types.ObjectId(params.clientId),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSpent: {
+            $sum: {
+              $add: [
+                { $ifNull: ["$servicePrice", 0] },
+                { $ifNull: ["$tips", 0] },
+              ],
+            },
+          },
+          totalVisit: { $sum: 1 },
+        },
+      },
+    ]),
   ]);
+
+  const stats = aggregation[0] || { totalSpent: 0, totalVisit: 0 };
+
+  const clientInfo = {
+    picture: client.picture || "",
+    clientName: client.fullName,
+    clientSince: new Date(client.createdAt).getFullYear().toString(),
+    totalVisit: stats.totalVisit,
+    notes: client.notes || "",
+    Phone: client.phoneNumber || "",
+    email: client.email || "",
+    totalSpent: stats.totalSpent,
+  };
 
   return {
     meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    clientInfo,
     data,
   };
 };

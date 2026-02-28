@@ -11,7 +11,7 @@ router.post("/", auth(), uploadPicture, clientController.create);
 
 router.get("/", auth(), clientController.getAll);
 
-router.get("/:id", auth(), clientController.getById);
+router.get("/home", auth(), clientController.getHomePageData);
 
 router.patch("/:id", auth(), uploadPicture, clientController.update);
 

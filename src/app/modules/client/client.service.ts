@@ -2,6 +2,7 @@ import { Request } from "express";
 import httpStatus from "http-status";
 import { v2 as cloudinary } from "cloudinary";
 import { Client } from "./client.model";
+import { ClientVisit } from "../clientVisit/clientVisit.model";
 import { clientValidation } from "./client.validation";
 import ApiError from "../../../errors/ApiErrors";
 import { fileUploader } from "../../../helpars/fileUploader";
@@ -23,11 +24,25 @@ const deleteFromCloudinary = (url: string | undefined) => {
   }
 };
 
+// Parse form-data body: handles both direct fields and JSON-wrapped "data" field
+const parseBody = (body: any) => {
+  if (body?.data) {
+    try {
+      return typeof body.data === "string" ? JSON.parse(body.data) : body.data;
+    } catch {
+      return body;
+    }
+  }
+  return body;
+};
+
 // Create a new client
 const createClient = async (req: Request) => {
   const userId = req.user.id;
 
-  const validatedData = clientValidation.createSchema.parse(req.body);
+  const validatedData = clientValidation.createSchema.parse(
+    parseBody(req.body),
+  );
 
   const clientData: Record<string, any> = {
     userId,
@@ -88,17 +103,6 @@ const getClients = async (
   };
 };
 
-// Get a single client by ID
-const getClientById = async (clientId: string, userId: string) => {
-  const client = await Client.findOne({ _id: clientId, userId }).lean();
-
-  if (!client) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Client not found");
-  }
-
-  return client;
-};
-
 // Update a client
 const updateClient = async (req: Request, clientId: string) => {
   const userId = req.user.id;
@@ -114,7 +118,9 @@ const updateClient = async (req: Request, clientId: string) => {
 
   const updateData: Record<string, any> = {};
 
-  const validatedData = clientValidation.updateSchema.parse(req.body);
+  const validatedData = clientValidation.updateSchema.parse(
+    parseBody(req.body),
+  );
   Object.assign(updateData, validatedData);
 
   // Handle picture: upload new first, then cleanup old
@@ -157,10 +163,64 @@ const deleteClient = async (clientId: string, userId: string) => {
   return null;
 };
 
+const getHomePageData = async (userId: string) => {
+  // Get all client IDs belonging to this user
+  const clientIds = await Client.find({ userId }).distinct("_id");
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const [totalClients, totalRecentVisits, recentVisits] = await Promise.all([
+    Client.countDocuments({ userId }),
+    ClientVisit.countDocuments({
+      clientId: { $in: clientIds },
+      createdAt: { $gte: sevenDaysAgo },
+    }),
+    // Get recent visits with unique clients, most recent first
+    ClientVisit.aggregate([
+      { $match: { clientId: { $in: clientIds } } },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$clientId",
+          lastVisitDate: { $first: "$createdAt" },
+          serviceType: { $first: "$serviceType" },
+        },
+      },
+      { $sort: { lastVisitDate: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: "clients",
+          localField: "_id",
+          foreignField: "_id",
+          as: "client",
+        },
+      },
+      { $unwind: "$client" },
+      {
+        $project: {
+          _id: 0,
+          clientId: "$_id",
+          picture: { $ifNull: ["$client.picture", ""] },
+          clientName: "$client.fullName",
+          last: { $ifNull: ["$serviceType", ""] },
+        },
+      },
+    ]),
+  ]);
+
+  return {
+    totalClients,
+    totalRecentVisits,
+    recentlyViewed: recentVisits,
+  };
+};
+
 export const clientService = {
   createClient,
   getClients,
-  getClientById,
   updateClient,
   deleteClient,
+  getHomePageData,
 };

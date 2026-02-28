@@ -28,16 +28,6 @@ const getAll = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getById = catchAsync(async (req: Request, res: Response) => {
-  const result = await clientService.getClientById(req.params.id, req.user.id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Client retrieved successfully!",
-    data: result,
-  });
-});
-
 const update = catchAsync(async (req: Request, res: Response) => {
   const result = await clientService.updateClient(req, req.params.id);
   sendResponse(res, {
@@ -58,10 +48,20 @@ const remove = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getHomePageData = catchAsync(async (req: Request, res: Response) => {
+  const result = await clientService.getHomePageData(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Home page data retrieved successfully!",
+    data: result,
+  });
+});
+
 export const clientController = {
   create,
   getAll,
-  getById,
   update,
   remove,
+  getHomePageData,
 };
