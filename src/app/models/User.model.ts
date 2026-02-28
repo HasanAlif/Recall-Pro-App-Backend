@@ -23,6 +23,7 @@ export interface IUser extends Document {
   mobileNumber: string;
   password: string;
   profilePicture?: string;
+  location?: string;
   role: UserRole;
   status: UserStatus;
   isDeleted: boolean;
@@ -54,6 +55,11 @@ const UserSchema = new Schema<IUser>(
     mobileNumber: {
       type: String,
       required: true,
+      trim: true,
+    },
+    location: {
+      type: String,
+      required: false,
       trim: true,
     },
     password: {
@@ -113,9 +119,7 @@ const UserSchema = new Schema<IUser>(
   },
 );
 
-// Indexes for better query performance (email index created by unique: true)
-UserSchema.index({ role: 1 });
-UserSchema.index({ status: 1 });
-UserSchema.index({ mobileNumber: 1 });
+
+UserSchema.index({ email: 1 });
 
 export const User = mongoose.model<IUser>("User", UserSchema);
