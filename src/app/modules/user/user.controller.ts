@@ -5,6 +5,7 @@ import pick from "../../../shared/pick";
 import sendResponse from "../../../shared/sendResponse";
 import { userFilterableFields } from "./user.costant";
 import { userService } from "./user.service";
+import { PremiumPlan } from "../../models";
 
 // Register new user - sends OTP
 const createUser = catchAsync(async (req: Request, res: Response) => {
@@ -136,6 +137,20 @@ const deleteMe = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Update own plan
+const updatePlan = catchAsync(async (req: Request, res: Response) => {
+  const result = await userService.updateUserPlan(
+    req.user.id,
+    req.body.plan as PremiumPlan,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Plan updated successfully!",
+    data: result,
+  });
+});
+
 export const userController = {
   createUser,
   verifyRegistrationOtp,
@@ -146,4 +161,5 @@ export const userController = {
   accountUpdate,
   deleteMe,
   profileImageChange,
+  updatePlan,
 };

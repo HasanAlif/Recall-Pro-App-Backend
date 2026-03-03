@@ -8,12 +8,21 @@ export enum UserRole {
 export enum UserStatus {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
-  BLOCKED = "BLOCKED",
 }
 
 export enum AuthProvider {
   LOCAL = "LOCAL",
   GOOGLE = "GOOGLE",
+}
+
+export enum PremiumPlan {
+  TRIAL = "TRIAL",
+  TRIAL_EXPIRED = "TRIAL_EXPIRED",
+  BASIC_MONTHLY = "BASIC_MONTHLY",
+  BASIC_ANNUAL = "BASIC_ANNUAL",
+  PREMIUM_MONTHLY = "PREMIUM_MONTHLY",
+  PREMIUM_ANNUAL = "PREMIUM_ANNUAL",
+  EXPIRED = "EXPIRED",
 }
 
 export interface IUser extends Document {
@@ -26,6 +35,9 @@ export interface IUser extends Document {
   location?: string;
   role: UserRole;
   status: UserStatus;
+  premiumPlan?: PremiumPlan;
+  premiumPlanExpiry?: Date | null;
+  isEnjoyedTrial: boolean;
   isDeleted: boolean;
   resetPasswordOtp?: string;
   resetPasswordOtpExpiry?: Date;
@@ -79,6 +91,19 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: Object.values(UserStatus),
       default: UserStatus.ACTIVE,
+    },
+    premiumPlan: {
+      type: String,
+      enum: Object.values(PremiumPlan),
+      default: null,
+    },
+    premiumPlanExpiry: {
+      type: Date,
+      default: null,
+    },
+    isEnjoyedTrial: {
+      type: Boolean,
+      default: false,
     },
     isDeleted: {
       type: Boolean,

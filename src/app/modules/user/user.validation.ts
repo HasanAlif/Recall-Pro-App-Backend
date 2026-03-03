@@ -34,10 +34,25 @@ const ResendRegistrationOtpSchema = z.object({
   email: z.string().email("Please provide a valid email"),
 });
 
+// Update plan
+const UpdatePlanSchema = z.object({
+  plan: z.enum(
+    [
+      "TRIAL",
+      "BASIC_MONTHLY",
+      "BASIC_ANNUAL",
+      "PREMIUM_MONTHLY",
+      "PREMIUM_ANNUAL",
+    ],
+    { required_error: "Plan is required" },
+  ),
+});
+
 export const UserValidation = {
   CreateUserValidationSchema,
   UserLoginValidationSchema,
   UpdateProfileSchema,
   VerifyRegistrationOtpSchema,
   ResendRegistrationOtpSchema,
+  UpdatePlanSchema,
 };

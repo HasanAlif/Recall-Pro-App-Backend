@@ -1,4 +1,4 @@
-import { User, IUser } from "../../models";
+import { User, IUser, PremiumPlan } from "../../models";
 import * as bcrypt from "bcrypt";
 import crypto from "crypto";
 import { Request } from "express";
@@ -352,6 +352,62 @@ const accountUpdateIntoDb = async (
   return result;
 };
 
+// System-only statuses — users cannot request these directly
+const REQUESTABLE_PLANS = new Set<PremiumPlan>([
+  PremiumPlan.TRIAL,
+  PremiumPlan.BASIC_MONTHLY,
+  PremiumPlan.BASIC_ANNUAL,
+  PremiumPlan.PREMIUM_MONTHLY,
+  PremiumPlan.PREMIUM_ANNUAL,
+]);
+
+// Duration in ms for each plan
+const PLAN_DURATION_MS: Record<string, number> = {
+  [PremiumPlan.TRIAL]: 30 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.BASIC_MONTHLY]: 30 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.BASIC_ANNUAL]: 365 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.PREMIUM_MONTHLY]: 30 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.PREMIUM_ANNUAL]: 365 * 24 * 60 * 60 * 1000,
+};
+
+const updateUserPlan = async (userId: string, plan: PremiumPlan) => {
+  // Reject system-managed statuses
+  if (!REQUESTABLE_PLANS.has(plan)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid plan selected");
+  }
+
+  const user = await User.findById(userId).select("isEnjoyedTrial").lean();
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // One-time trial guard
+  if (plan === PremiumPlan.TRIAL && user.isEnjoyedTrial) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "You have already enjoyed the free trial. Please choose a paid plan.",
+    );
+  }
+
+  const updateData: Record<string, any> = {
+    premiumPlan: plan,
+    premiumPlanExpiry: new Date(Date.now() + PLAN_DURATION_MS[plan]),
+  };
+
+  // Permanently mark trial consumed so it can never be re-claimed
+  if (plan === PremiumPlan.TRIAL) {
+    updateData.isEnjoyedTrial = true;
+  }
+
+  const result = await User.findByIdAndUpdate(userId, updateData, {
+    new: true,
+    select:
+      "_id fullName email mobileNumber profilePicture role premiumPlan premiumPlanExpiry isEnjoyedTrial",
+  }).lean();
+
+  return result;
+};
+
 export const userService = {
   createUserIntoDb,
   verifyRegistrationOtp,
@@ -362,4 +418,5 @@ export const userService = {
   deleteUserFromDb,
   profileImageChange,
   accountUpdateIntoDb,
+  updateUserPlan,
 };

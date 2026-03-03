@@ -53,6 +53,14 @@ router.patch(
   userController.accountUpdate,
 );
 
+// Update own plan
+router.patch(
+  "/plan",
+  auth(),
+  validateRequest(UserValidation.UpdatePlanSchema),
+  userController.updatePlan,
+);
+
 // Delete own account
 router.delete("/me", auth(), userController.deleteMe);
 
