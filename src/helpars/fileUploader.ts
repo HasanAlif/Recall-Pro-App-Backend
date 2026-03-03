@@ -43,7 +43,17 @@ cloudinary.config({
 
 // Multer configuration using memoryStorage (for DigitalOcean & Cloudinary)
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.size > 10 * 1024 * 1024) {
+      cb(new Error("Image file is too Large. Maximum file size 10 MB"));
+    } else {
+      cb(null, true);
+    }
+  },
+});
 
 // ✅ Fixed Cloudinary Storage
 const cloudinaryStorage = new CloudinaryStorage({
