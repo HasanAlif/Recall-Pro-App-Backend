@@ -25,4 +25,10 @@ router.get(
 
 router.get("/users", auth(UserRole.ADMIN), adminController.getAllUsers);
 
+router.get(
+  "/premium-users",
+  auth(UserRole.ADMIN),
+  adminController.getPremiumUsers,
+);
+
 export const adminRoutes = router;

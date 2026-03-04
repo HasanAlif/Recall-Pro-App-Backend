@@ -115,6 +115,17 @@ const getAllUsers = catchAsync(async (req, res) => {
   });
 });
 
+const getPremiumUsers = catchAsync(async (req, res) => {
+  const result = await adminService.getPremiumUsers();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Premium users retrieved successfully",
+    data: result,
+  });
+});
+
 export const adminController = {
   createOrUpdateContent,
   getContentByType,
@@ -122,4 +133,5 @@ export const adminController = {
   getMonthlyUserGrowth,
   getMonthlyPremiumUsersGrowth,
   getAllUsers,
+  getPremiumUsers,
 };

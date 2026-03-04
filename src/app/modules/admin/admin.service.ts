@@ -380,6 +380,70 @@ const getAllUsers = async (status?: string) => {
   }));
 };
 
+type PremiumUserResult = {
+  fullName: string;
+  profilePicture?: string;
+  email: string;
+  mobileNumber: string;
+  premiumPlan: PremiumPlan | null;
+  premiumPlanExpiry?: Date | null;
+};
+
+const MONTHLY_PLANS = new Set<PremiumPlan>([
+  PremiumPlan.BASIC_MONTHLY,
+  PremiumPlan.PREMIUM_MONTHLY,
+]);
+
+const getPlanLabel = (plan: PremiumPlan): "Monthly" | "Yearly" => {
+  return MONTHLY_PLANS.has(plan) ? "Monthly" : "Yearly";
+};
+
+const getPremiumUsers = async () => {
+  const users = await User.aggregate<PremiumUserResult>([
+    {
+      $match: {
+        isDeleted: false,
+        premiumPlan: { $in: PAID_PREMIUM_PLANS },
+      },
+    },
+    { $sort: { premiumPlanExpiry: -1 } },
+    {
+      $project: {
+        _id: 0,
+        fullName: 1,
+        email: 1,
+        mobileNumber: 1,
+        profilePicture: 1,
+        premiumPlan: 1,
+        premiumPlanExpiry: 1,
+      },
+    },
+  ]);
+
+  return users.map((user) => {
+    let billingDate: string | null = null;
+
+    if (user.premiumPlan && user.premiumPlanExpiry) {
+      const duration = PAID_PLAN_DURATION_MS[user.premiumPlan];
+      if (duration) {
+        const purchasedAt = new Date(
+          new Date(user.premiumPlanExpiry).getTime() - duration,
+        );
+        billingDate = formatJoinedDate(purchasedAt);
+      }
+    }
+
+    return {
+      fullName: user.fullName,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      profilePicture: user.profilePicture,
+      billingDate,
+      plan: user.premiumPlan ? getPlanLabel(user.premiumPlan) : null,
+    };
+  });
+};
+
 export const adminService = {
   getContentTypeName,
   createOrUpdateContent,
@@ -388,4 +452,5 @@ export const adminService = {
   getMonthlyUserGrowth,
   getMonthlyPremiumUsersGrowth,
   getAllUsers,
+  getPremiumUsers,
 };
