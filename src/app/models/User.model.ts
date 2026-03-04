@@ -38,6 +38,10 @@ export interface IUser extends Document {
   status: UserStatus;
   premiumPlan?: PremiumPlan;
   premiumPlanExpiry?: Date | null;
+  // premiumPlanHistory: {
+  //   plan: PremiumPlan;
+  //   purchasedAt: Date;
+  // }[];
   isEnjoyedTrial: boolean;
   isDeleted: boolean;
   resetPasswordOtp?: string;
@@ -102,6 +106,23 @@ const UserSchema = new Schema<IUser>(
       type: Date,
       default: null,
     },
+    // premiumPlanHistory: {
+    //   type: [
+    //     {
+    //       plan: {
+    //         type: String,
+    //         enum: Object.values(PremiumPlan),
+    //         required: true,
+    //       },
+    //       purchasedAt: {
+    //         type: Date,
+    //         required: true,
+    //         default: Date.now,
+    //       },
+    //     },
+    //   ],
+    //   default: [],
+    // },
     isEnjoyedTrial: {
       type: Boolean,
       default: false,

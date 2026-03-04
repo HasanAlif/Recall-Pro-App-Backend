@@ -33,6 +33,16 @@ const MONTH_SHORT_NAMES = [
   "Dec",
 ];
 
+const PAID_PLAN_DURATION_MS: Record<PremiumPlan, number> = {
+  [PremiumPlan.TRIAL]: 30 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.TRIAL_EXPIRED]: 0,
+  [PremiumPlan.BASIC_MONTHLY]: 30 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.BASIC_ANNUAL]: 365 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.PREMIUM_MONTHLY]: 30 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.PREMIUM_ANNUAL]: 365 * 24 * 60 * 60 * 1000,
+  [PremiumPlan.EXPIRED]: 0,
+};
+
 const ACTIVE_PLAN_SET = new Set<PremiumPlan>(ACTIVE_PREMIUM_PLANS);
 
 const formatJoinedDate = (date: Date): string => {
@@ -246,10 +256,94 @@ const getMonthlyUserGrowth = async (year: number) => {
   }));
 };
 
+const getMonthlyPremiumUsersGrowth = async (year: number) => {
+  const yearStartDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+  const nextYearStartDate = new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0, 0));
+
+  const growthData = await User.aggregate<MonthlyGrowthAggregateResult>([
+    {
+      $match: {
+        isDeleted: false,
+        premiumPlanHistory: { $exists: true, $ne: [] },
+      },
+    },
+    {
+      $unwind: "$premiumPlanHistory",
+    },
+    {
+      $match: {
+        "premiumPlanHistory.plan": {
+          $in: PAID_PREMIUM_PLANS,
+        },
+        "premiumPlanHistory.purchasedAt": {
+          $gte: yearStartDate,
+          $lt: nextYearStartDate,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: { $month: "$premiumPlanHistory.purchasedAt" },
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $sort: {
+        _id: 1,
+      },
+    },
+  ]);
+
+  const growthCountByMonth = new Map<number, number>(
+    growthData.map((item) => [item._id, item.count]),
+  );
+
+  const legacyPremiumUsers = await User.find({
+    isDeleted: false,
+    premiumPlan: { $in: PAID_PREMIUM_PLANS },
+    premiumPlanExpiry: { $ne: null },
+    $or: [
+      { premiumPlanHistory: { $exists: false } },
+      { premiumPlanHistory: { $size: 0 } },
+    ],
+  })
+    .select("premiumPlan premiumPlanExpiry")
+    .lean();
+
+  legacyPremiumUsers.forEach((user) => {
+    if (!user.premiumPlan || !user.premiumPlanExpiry) {
+      return;
+    }
+
+    const duration = PAID_PLAN_DURATION_MS[user.premiumPlan];
+    if (!duration) {
+      return;
+    }
+
+    const purchasedAt = new Date(
+      new Date(user.premiumPlanExpiry).getTime() - duration,
+    );
+
+    if (purchasedAt >= yearStartDate && purchasedAt < nextYearStartDate) {
+      const monthIndex = purchasedAt.getUTCMonth() + 1;
+      growthCountByMonth.set(
+        monthIndex,
+        (growthCountByMonth.get(monthIndex) ?? 0) + 1,
+      );
+    }
+  });
+
+  return MONTH_SHORT_NAMES.map((monthName, index) => ({
+    month: `${monthName} ${year}`,
+    count: growthCountByMonth.get(index + 1) ?? 0,
+  }));
+};
+
 export const adminService = {
   getContentTypeName,
   createOrUpdateContent,
   getContentByType,
   dashboardOverviewData,
   getMonthlyUserGrowth,
+  getMonthlyPremiumUsersGrowth,
 };

@@ -195,6 +195,13 @@ const REQUESTABLE_PLANS = new Set<PremiumPlan>([
   PremiumPlan.PREMIUM_ANNUAL,
 ]);
 
+// const PAID_REQUESTABLE_PLANS = new Set<PremiumPlan>([
+//   PremiumPlan.BASIC_MONTHLY,
+//   PremiumPlan.BASIC_ANNUAL,
+//   PremiumPlan.PREMIUM_MONTHLY,
+//   PremiumPlan.PREMIUM_ANNUAL,
+// ]);
+
 // Duration in ms for each plan
 const PLAN_DURATION_MS: Record<string, number> = {
   [PremiumPlan.TRIAL]: 30 * 24 * 60 * 60 * 1000,
@@ -232,6 +239,15 @@ const updateUserPlan = async (userId: string, plan: PremiumPlan) => {
   if (plan === PremiumPlan.TRIAL) {
     updateData.isEnjoyedTrial = true;
   }
+
+  // if (PAID_REQUESTABLE_PLANS.has(plan)) {
+  //   updateData.$push = {
+  //     premiumPlanHistory: {
+  //       plan,
+  //       purchasedAt: new Date(),
+  //     },
+  //   };
+  // }
 
   const result = await User.findByIdAndUpdate(userId, updateData, {
     new: true,

@@ -60,7 +60,9 @@ const dashboardOverviewData = catchAsync(async (req, res) => {
 });
 
 const getMonthlyUserGrowth = catchAsync(async (req, res) => {
-  const yearQuery = Array.isArray(req.query.year) ? req.query.year[0] : req.query.year;
+  const yearQuery = Array.isArray(req.query.year)
+    ? req.query.year[0]
+    : req.query.year;
   const year = Number(yearQuery);
 
   const result = await adminService.getMonthlyUserGrowth(year);
@@ -73,9 +75,26 @@ const getMonthlyUserGrowth = catchAsync(async (req, res) => {
   });
 });
 
+const getMonthlyPremiumUsersGrowth = catchAsync(async (req, res) => {
+  const yearQuery = Array.isArray(req.query.year)
+    ? req.query.year[0]
+    : req.query.year;
+  const year = Number(yearQuery);
+
+  const result = await adminService.getMonthlyPremiumUsersGrowth(year);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Monthly premium users growth retrieved successfully",
+    data: result,
+  });
+});
+
 export const adminController = {
   createOrUpdateContent,
   getContentByType,
   dashboardOverviewData,
   getMonthlyUserGrowth,
+  getMonthlyPremiumUsersGrowth,
 };
