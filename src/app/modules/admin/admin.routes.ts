@@ -23,4 +23,6 @@ router.get(
   adminController.getMonthlyPremiumUsersGrowth,
 );
 
+router.get("/users", auth(UserRole.ADMIN), adminController.getAllUsers);
+
 export const adminRoutes = router;

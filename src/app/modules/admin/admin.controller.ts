@@ -91,10 +91,35 @@ const getMonthlyPremiumUsersGrowth = catchAsync(async (req, res) => {
   });
 });
 
+const getAllUsers = catchAsync(async (req, res) => {
+  const statusQuery = Array.isArray(req.query.status)
+    ? (req.query.status[0] as string)
+    : (req.query.status as string | undefined);
+
+  const status = statusQuery?.toLowerCase();
+
+  if (status !== undefined && status !== "active" && status !== "inactive") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid status value. Use 'active' or 'inactive'.",
+    );
+  }
+
+  const result = await adminService.getAllUsers(status);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Users retrieved successfully",
+    data: result,
+  });
+});
+
 export const adminController = {
   createOrUpdateContent,
   getContentByType,
   dashboardOverviewData,
   getMonthlyUserGrowth,
   getMonthlyPremiumUsersGrowth,
+  getAllUsers,
 };

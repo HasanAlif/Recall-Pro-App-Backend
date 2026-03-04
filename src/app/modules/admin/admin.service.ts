@@ -339,6 +339,47 @@ const getMonthlyPremiumUsersGrowth = async (year: number) => {
   }));
 };
 
+const getAllUsers = async (status?: string) => {
+  type UserStatus = "Active" | "Inactive";
+
+  let matchFilter: Record<string, unknown> = { isDeleted: false };
+
+  if (status === "active") {
+    matchFilter.premiumPlan = { $in: ACTIVE_PREMIUM_PLANS };
+  } else if (status === "inactive") {
+    matchFilter.$or = [
+      { premiumPlan: { $in: INACTIVE_PREMIUM_PLANS } },
+      { premiumPlan: null },
+      { premiumPlan: { $exists: false } },
+    ];
+  }
+
+  const users = await User.aggregate<RecentUserResult>([
+    { $match: matchFilter },
+    { $sort: { createdAt: -1 } },
+    {
+      $project: {
+        _id: 0,
+        fullName: 1,
+        email: 1,
+        mobileNumber: 1,
+        profilePicture: 1,
+        createdAt: 1,
+        premiumPlan: 1,
+      },
+    },
+  ]);
+
+  return users.map((user) => ({
+    fullName: user.fullName,
+    email: user.email,
+    mobileNumber: user.mobileNumber,
+    profilePicture: user.profilePicture,
+    Joined: formatJoinedDate(user.createdAt),
+    status: getUserActivityStatus(user.premiumPlan) as UserStatus,
+  }));
+};
+
 export const adminService = {
   getContentTypeName,
   createOrUpdateContent,
@@ -346,4 +387,5 @@ export const adminService = {
   dashboardOverviewData,
   getMonthlyUserGrowth,
   getMonthlyPremiumUsersGrowth,
+  getAllUsers,
 };
