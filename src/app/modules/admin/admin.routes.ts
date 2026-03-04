@@ -11,4 +11,10 @@ router.get(
   adminController.dashboardOverviewData,
 );
 
+router.get(
+  "/monthly-user-growth",
+  auth(UserRole.ADMIN),
+  adminController.getMonthlyUserGrowth,
+);
+
 export const adminRoutes = router;

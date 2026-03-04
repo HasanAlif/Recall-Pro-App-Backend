@@ -1,4 +1,5 @@
 import httpStatus from "http-status";
+import ApiError from "../../../errors/ApiErrors";
 import sendResponse from "../../../shared/sendResponse";
 import catchAsync from "../../../shared/catchAsync";
 import { adminService } from "./admin.service";
@@ -58,8 +59,23 @@ const dashboardOverviewData = catchAsync(async (req, res) => {
   });
 });
 
+const getMonthlyUserGrowth = catchAsync(async (req, res) => {
+  const yearQuery = Array.isArray(req.query.year) ? req.query.year[0] : req.query.year;
+  const year = Number(yearQuery);
+
+  const result = await adminService.getMonthlyUserGrowth(year);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Monthly user growth retrieved successfully",
+    data: result,
+  });
+});
+
 export const adminController = {
   createOrUpdateContent,
   getContentByType,
   dashboardOverviewData,
+  getMonthlyUserGrowth,
 };

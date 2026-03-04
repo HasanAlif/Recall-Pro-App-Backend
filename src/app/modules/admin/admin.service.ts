@@ -18,6 +18,21 @@ const INACTIVE_PREMIUM_PLANS: PremiumPlan[] = [
   PremiumPlan.EXPIRED,
 ];
 
+const MONTH_SHORT_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
 const ACTIVE_PLAN_SET = new Set<PremiumPlan>(ACTIVE_PREMIUM_PLANS);
 
 const formatJoinedDate = (date: Date): string => {
@@ -189,10 +204,52 @@ const dashboardOverviewData = async () => {
     })),
   };
 };
+type MonthlyGrowthAggregateResult = {
+  _id: number;
+  count: number;
+};
+
+const getMonthlyUserGrowth = async (year: number) => {
+  const yearStartDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+  const nextYearStartDate = new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0, 0));
+
+  const growthData = await User.aggregate<MonthlyGrowthAggregateResult>([
+    {
+      $match: {
+        isDeleted: false,
+        createdAt: {
+          $gte: yearStartDate,
+          $lt: nextYearStartDate,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: { $month: "$createdAt" },
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $sort: {
+        _id: 1,
+      },
+    },
+  ]);
+
+  const growthCountByMonth = new Map<number, number>(
+    growthData.map((item) => [item._id, item.count]),
+  );
+
+  return MONTH_SHORT_NAMES.map((monthName, index) => ({
+    month: `${monthName} ${year}`,
+    count: growthCountByMonth.get(index + 1) ?? 0,
+  }));
+};
 
 export const adminService = {
   getContentTypeName,
   createOrUpdateContent,
   getContentByType,
   dashboardOverviewData,
+  getMonthlyUserGrowth,
 };
