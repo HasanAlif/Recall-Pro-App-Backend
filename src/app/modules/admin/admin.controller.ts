@@ -47,7 +47,19 @@ const getContentByType = catchAsync(async (req, res) => {
   });
 });
 
+const dashboardOverviewData = catchAsync(async (req, res) => {
+  const result = await adminService.dashboardOverviewData();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Dashboard overview retrieved successfully",
+    data: result,
+  });
+});
+
 export const adminController = {
   createOrUpdateContent,
   getContentByType,
+  dashboardOverviewData,
 };

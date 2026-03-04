@@ -64,79 +64,6 @@ const resendRegistrationOtp = catchAsync(
   },
 );
 
-// Get all users
-const getUsers = catchAsync(async (req: Request, res: Response) => {
-  const filters = pick(req.query, userFilterableFields);
-  const options = pick(req.query, ["limit", "page", "sortBy", "sortOrder"]);
-
-  const result = await userService.getUsersFromDb(filters, options);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Users retrieved successfully!",
-    meta: result.meta,
-    data: result.data,
-  });
-});
-
-// Update profile
-const updateProfile = catchAsync(async (req: Request, res: Response) => {
-  const result = await userService.updateProfile(req);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Profile updated successfully!",
-    data: result,
-  });
-});
-
-// Update user (Admin)
-const updateUser = catchAsync(async (req: Request, res: Response) => {
-  const result = await userService.updateUserIntoDb(req.body, req.params.id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "User updated successfully!",
-    data: result,
-  });
-});
-
-// Update profile image
-const profileImageChange = catchAsync(async (req: Request, res: Response) => {
-  const result = await userService.profileImageChange(req);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Profile image updated successfully!",
-    data: result,
-  });
-});
-
-// Update account
-const accountUpdate = catchAsync(async (req: Request, res: Response) => {
-  const result = await userService.accountUpdateIntoDb(req.body, req.user.id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Account updated successfully!",
-    data: result,
-  });
-});
-
-// Delete account
-const deleteMe = catchAsync(async (req: Request, res: Response) => {
-  const result = await userService.deleteUserFromDb(req.user.id);
-
-  res.clearCookie("token");
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Account deleted successfully!",
-    data: result,
-  });
-});
-
 // Update own plan
 const updatePlan = catchAsync(async (req: Request, res: Response) => {
   const result = await userService.updateUserPlan(
@@ -155,11 +82,5 @@ export const userController = {
   createUser,
   verifyRegistrationOtp,
   resendRegistrationOtp,
-  getUsers,
-  updateProfile,
-  updateUser,
-  accountUpdate,
-  deleteMe,
-  profileImageChange,
   updatePlan,
 };

@@ -6,6 +6,7 @@ import { clientVisitRoutes } from "../modules/clientVisit/clientVisit.routes";
 import { analyticsRoutes } from "../modules/analytics/analytics.routes";
 import { profileRoutes } from "../modules/profile/profile.routes";
 import { appContentRoutes } from "../modules/admin/appContent.route";
+import { adminRoutes } from "../modules/admin/admin.routes";
 
 const router = express.Router();
 
@@ -37,6 +38,10 @@ const moduleRoutes = [
   {
     path: "/app-content",
     route: appContentRoutes,
+  },
+  {
+    path: "/admin",
+    route: adminRoutes,
   },
 ];
 
