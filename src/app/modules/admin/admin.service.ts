@@ -398,12 +398,27 @@ const getPlanLabel = (plan: PremiumPlan): "Monthly" | "Yearly" => {
   return MONTHLY_PLANS.has(plan) ? "Monthly" : "Yearly";
 };
 
-const getPremiumUsers = async () => {
+const YEARLY_PLANS: PremiumPlan[] = [
+  PremiumPlan.BASIC_ANNUAL,
+  PremiumPlan.PREMIUM_ANNUAL,
+];
+
+const getPremiumUsers = async (plan?: string) => {
+  let planFilter: PremiumPlan[];
+
+  if (plan === "monthly") {
+    planFilter = Array.from(MONTHLY_PLANS);
+  } else if (plan === "yearly") {
+    planFilter = YEARLY_PLANS;
+  } else {
+    planFilter = PAID_PREMIUM_PLANS;
+  }
+
   const users = await User.aggregate<PremiumUserResult>([
     {
       $match: {
         isDeleted: false,
-        premiumPlan: { $in: PAID_PREMIUM_PLANS },
+        premiumPlan: { $in: planFilter },
       },
     },
     { $sort: { premiumPlanExpiry: -1 } },

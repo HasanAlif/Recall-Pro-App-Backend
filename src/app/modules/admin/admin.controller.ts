@@ -116,7 +116,20 @@ const getAllUsers = catchAsync(async (req, res) => {
 });
 
 const getPremiumUsers = catchAsync(async (req, res) => {
-  const result = await adminService.getPremiumUsers();
+  const planQuery = Array.isArray(req.query.plan)
+    ? (req.query.plan[0] as string)
+    : (req.query.plan as string | undefined);
+
+  const plan = planQuery?.toLowerCase();
+
+  if (plan !== undefined && plan !== "monthly" && plan !== "yearly") {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Invalid plan value. Use 'monthly' or 'yearly'.",
+    );
+  }
+
+  const result = await adminService.getPremiumUsers(plan);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
