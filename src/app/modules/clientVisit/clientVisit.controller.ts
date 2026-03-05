@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import pick from "../../../shared/pick";
 import sendResponse from "../../../shared/sendResponse";
+import ApiError from "../../../errors/ApiErrors";
 import { clientVisitService } from "./clientVisit.service";
 
 const create = catchAsync(async (req: Request, res: Response) => {
@@ -64,9 +65,30 @@ const getAllVisits = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const searchVisits = catchAsync(async (req: Request, res: Response) => {
+  const serviceType = (req.query.serviceType as string) ?? "";
+  if (!serviceType.trim()) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Query param 'serviceType' is required",
+    );
+  }
+  const result = await clientVisitService.searchVisitsByServiceType(
+    req.user.id,
+    serviceType,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Visits retrieved successfully!",
+    data: result,
+  });
+});
+
 export const clientVisitController = {
   create,
   getAll,
   getById,
   getAllVisits,
+  searchVisits,
 };

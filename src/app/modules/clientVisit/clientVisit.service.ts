@@ -190,9 +190,93 @@ const getAllVisits = async (
   };
 };
 
+// Escape regex special characters to prevent ReDoS
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const searchVisitsByServiceType = async (
+  userId: string,
+  serviceType: string,
+) => {
+  const trimmed = serviceType.trim();
+  if (!trimmed) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "serviceType cannot be empty");
+  }
+
+  const escaped = escapeRegex(trimmed);
+  const clientIds = await Client.find({ userId }).distinct("_id");
+
+  const visits = await ClientVisit.aggregate([
+    {
+      $match: {
+        clientId: { $in: clientIds },
+        serviceType: { $regex: escaped, $options: "i" },
+      },
+    },
+    {
+      $addFields: {
+        score: {
+          $switch: {
+            branches: [
+              // Exact match
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$serviceType",
+                    regex: `^${escaped}$`,
+                    options: "i",
+                  },
+                },
+                then: 3,
+              },
+              // Starts with
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$serviceType",
+                    regex: `^${escaped}`,
+                    options: "i",
+                  },
+                },
+                then: 2,
+              },
+            ],
+            // Contains anywhere
+            default: 1,
+          },
+        },
+      },
+    },
+    { $sort: { score: -1, date: -1 } },
+    { $limit: 50 },
+    {
+      $lookup: {
+        from: "clients",
+        localField: "clientId",
+        foreignField: "_id",
+        as: "client",
+      },
+    },
+    { $unwind: { path: "$client", preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 1,
+        clientId: 1,
+        serviceType: 1,
+        photos: 1,
+        videos: 1,
+        date: 1,
+        clientName: { $ifNull: ["$client.fullName", ""] },
+      },
+    },
+  ]);
+
+  return visits;
+};
+
 export const clientVisitService = {
   createVisit,
   getVisits,
   getVisitById,
   getAllVisits,
+  searchVisitsByServiceType,
 };
