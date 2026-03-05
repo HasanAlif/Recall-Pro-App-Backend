@@ -33,4 +33,10 @@ router.get(
   adminController.getPremiumUsers,
 );
 
+router.get(
+  "/premium-users/search",
+  auth(UserRole.ADMIN),
+  adminController.searchPremiumUsers,
+);
+
 export const adminRoutes = router;

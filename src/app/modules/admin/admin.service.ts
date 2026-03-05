@@ -582,6 +582,94 @@ const searchUserByName = async (name: string) => {
   }));
 };
 
+const searchPremiumUsersByName = async (name: string) => {
+  const trimmed = name.trim();
+
+  const escaped = escapeRegex(trimmed);
+
+  const users = await User.aggregate([
+    {
+      $match: {
+        isDeleted: false,
+        premiumPlan: { $in: PAID_PREMIUM_PLANS },
+        fullName: { $regex: escaped, $options: "i" },
+      },
+    },
+    {
+      $addFields: {
+        score: {
+          $switch: {
+            branches: [
+              // Exact match
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$fullName",
+                    regex: `^${escaped}$`,
+                    options: "i",
+                  },
+                },
+                then: 3,
+              },
+              // Starts with
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$fullName",
+                    regex: `^${escaped}`,
+                    options: "i",
+                  },
+                },
+                then: 2,
+              },
+            ],
+            // Contains anywhere
+            default: 1,
+          },
+        },
+      },
+    },
+    { $sort: { score: -1, fullName: 1 } },
+    { $limit: 50 },
+    {
+      $project: {
+        _id: 0,
+        fullName: 1,
+        email: 1,
+        mobileNumber: 1,
+        profilePicture: 1,
+        premiumPlan: 1,
+        premiumPlanExpiry: 1,
+      },
+    },
+  ]);
+
+  return users.map((user) => {
+    let billingDate: string | null = null;
+
+    if (user.premiumPlan && user.premiumPlanExpiry) {
+      const duration = PAID_PLAN_DURATION_MS[user.premiumPlan as PremiumPlan];
+      if (duration) {
+        const purchasedAt = new Date(
+          new Date(user.premiumPlanExpiry).getTime() - duration,
+        );
+        billingDate = formatJoinedDate(purchasedAt);
+      }
+    }
+
+    return {
+      fullName: user.fullName,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      profilePicture: user.profilePicture,
+      billingDate,
+      plan: user.premiumPlan
+        ? getPlanLabel(user.premiumPlan as PremiumPlan)
+        : null,
+    };
+  });
+};
+
 export const adminService = {
   getContentTypeName,
   createOrUpdateContent,
@@ -592,4 +680,5 @@ export const adminService = {
   getAllUsers,
   getPremiumUsers,
   searchUserByName,
+  searchPremiumUsersByName,
 };

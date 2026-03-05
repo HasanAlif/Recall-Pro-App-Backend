@@ -162,6 +162,23 @@ const searchUsers = catchAsync(async (req, res) => {
   });
 });
 
+const searchPremiumUsers = catchAsync(async (req, res) => {
+  const name = (req.query.name as string) ?? "";
+  if (!name.trim()) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Query param 'name' is required",
+    );
+  }
+  const result = await adminService.searchPremiumUsersByName(name);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Premium users retrieved successfully",
+    data: result,
+  });
+});
+
 export const adminController = {
   createOrUpdateContent,
   getContentByType,
@@ -171,4 +188,5 @@ export const adminController = {
   getAllUsers,
   getPremiumUsers,
   searchUsers,
+  searchPremiumUsers,
 };
