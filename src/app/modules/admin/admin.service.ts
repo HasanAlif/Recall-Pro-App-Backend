@@ -506,6 +506,82 @@ const getPremiumUsers = async (
   };
 };
 
+// Escape regex special characters to prevent ReDoS
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const searchUserByName = async (name: string) => {
+  const trimmed = name.trim();
+
+  const escaped = escapeRegex(trimmed);
+
+  const users = await User.aggregate([
+    {
+      $match: {
+        isDeleted: false,
+        fullName: { $regex: escaped, $options: "i" },
+      },
+    },
+    {
+      $addFields: {
+        score: {
+          $switch: {
+            branches: [
+              // Exact match
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$fullName",
+                    regex: `^${escaped}$`,
+                    options: "i",
+                  },
+                },
+                then: 3,
+              },
+              // Starts with
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$fullName",
+                    regex: `^${escaped}`,
+                    options: "i",
+                  },
+                },
+                then: 2,
+              },
+            ],
+            // Contains anywhere
+            default: 1,
+          },
+        },
+      },
+    },
+    { $sort: { score: -1, fullName: 1 } },
+    { $limit: 50 },
+    {
+      $project: {
+        _id: 0,
+        fullName: 1,
+        email: 1,
+        mobileNumber: 1,
+        location: 1,
+        profilePicture: 1,
+        createdAt: 1,
+        premiumPlan: 1,
+      },
+    },
+  ]);
+
+  return users.map((user) => ({
+    fullName: user.fullName,
+    email: user.email,
+    mobileNumber: user.mobileNumber,
+    location: user.location || "",
+    profilePicture: user.profilePicture,
+    Joined: formatJoinedDate(user.createdAt),
+    status: getUserActivityStatus(user.premiumPlan),
+  }));
+};
+
 export const adminService = {
   getContentTypeName,
   createOrUpdateContent,
@@ -515,4 +591,5 @@ export const adminService = {
   getMonthlyPremiumUsersGrowth,
   getAllUsers,
   getPremiumUsers,
+  searchUserByName,
 };

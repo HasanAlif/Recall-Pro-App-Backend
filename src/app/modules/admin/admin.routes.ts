@@ -25,6 +25,8 @@ router.get(
 
 router.get("/users", auth(UserRole.ADMIN), adminController.getAllUsers);
 
+router.get("/users/search", auth(UserRole.ADMIN), adminController.searchUsers);
+
 router.get(
   "/premium-users",
   auth(UserRole.ADMIN),
