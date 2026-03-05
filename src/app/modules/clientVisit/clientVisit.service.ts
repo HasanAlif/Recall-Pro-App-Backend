@@ -139,8 +139,60 @@ const getVisitById = async (visitId: string, userId: string) => {
   };
 };
 
+const getAllVisits = async (
+  userId: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  const clientIds = await Client.find({ userId }).distinct("_id");
+
+  const skip = (page - 1) * limit;
+  const matchFilter = { clientId: { $in: clientIds } };
+
+  const [visits, totalCount] = await Promise.all([
+    ClientVisit.aggregate([
+      { $match: matchFilter },
+      { $sort: { date: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: "clients",
+          localField: "clientId",
+          foreignField: "_id",
+          as: "client",
+        },
+      },
+      { $unwind: { path: "$client", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          clientId: 1,
+          clientName: { $ifNull: ["$client.fullName", ""] },
+          serviceType: 1,
+          photos: 1,
+          videos: 1,
+          date: 1,
+        },
+      },
+    ]),
+    ClientVisit.countDocuments(matchFilter),
+  ]);
+
+  return {
+    meta: {
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+    },
+    visits,
+  };
+};
+
 export const clientVisitService = {
   createVisit,
   getVisits,
   getVisitById,
+  getAllVisits,
 };

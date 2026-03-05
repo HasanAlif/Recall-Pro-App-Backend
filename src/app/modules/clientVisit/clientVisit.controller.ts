@@ -48,8 +48,25 @@ const getById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllVisits = catchAsync(async (req: Request, res: Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+  const result = await clientVisitService.getAllVisits(
+    req.user.id,
+    page,
+    limit,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "All visits retrieved successfully!",
+    data: result,
+  });
+});
+
 export const clientVisitController = {
   create,
   getAll,
   getById,
+  getAllVisits,
 };

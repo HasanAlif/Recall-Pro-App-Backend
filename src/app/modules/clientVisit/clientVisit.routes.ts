@@ -18,6 +18,12 @@ router.post(
   clientVisitController.create,
 );
 
+router.get(
+  "/all-visits",
+  auth(UserRole.USER),
+  clientVisitController.getAllVisits,
+);
+
 router.get("/", auth(UserRole.USER), clientVisitController.getAll);
 
 router.get("/:id", auth(UserRole.USER), clientVisitController.getById);
