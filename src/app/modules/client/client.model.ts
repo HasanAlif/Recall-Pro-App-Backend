@@ -48,7 +48,7 @@ const ClientSchema = new Schema<IClient>(
   },
 );
 
-// Index for better performance
-ClientSchema.index({ fullName: 1 });
+// Compound index — covers all searchClientByName queries in one scan
+ClientSchema.index({ userId: 1, fullName: 1 });
 
 export const Client = mongoose.model<IClient>("Client", ClientSchema);

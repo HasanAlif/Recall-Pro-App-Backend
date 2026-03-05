@@ -14,6 +14,8 @@ router.get("/", auth(UserRole.USER), clientController.getAll);
 
 router.get("/home", auth(UserRole.USER), clientController.getHomePageData);
 
+router.get("/search", auth(UserRole.USER), clientController.search);
+
 router.patch(
   "/:id",
   auth(UserRole.USER),

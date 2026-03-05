@@ -207,7 +207,7 @@ const dashboardOverviewData = async () => {
       fullName: user.fullName,
       email: user.email,
       mobileNumber: user.mobileNumber,
-      location: user.location,
+      location: user.location || "",
       profilePicture: user.profilePicture,
       Joined: formatJoinedDate(user.createdAt),
       status: getUserActivityStatus(user.premiumPlan),
@@ -372,6 +372,7 @@ const getAllUsers = async (
           fullName: 1,
           email: 1,
           mobileNumber: 1,
+          location: 1,
           profilePicture: 1,
           createdAt: 1,
           premiumPlan: 1,
@@ -385,6 +386,7 @@ const getAllUsers = async (
     fullName: user.fullName,
     email: user.email,
     mobileNumber: user.mobileNumber,
+    location: user.location || "",
     profilePicture: user.profilePicture,
     Joined: formatJoinedDate(user.createdAt),
     status: getUserActivityStatus(user.premiumPlan) as UserStatus,
@@ -406,6 +408,7 @@ type PremiumUserResult = {
   profilePicture?: string;
   email: string;
   mobileNumber: string;
+  location?: string;
   premiumPlan: PremiumPlan | null;
   premiumPlanExpiry?: Date | null;
 };
@@ -458,6 +461,7 @@ const getPremiumUsers = async (
           fullName: 1,
           email: 1,
           mobileNumber: 1,
+          location: 1,
           profilePicture: 1,
           premiumPlan: 1,
           premiumPlanExpiry: 1,
@@ -485,6 +489,7 @@ const getPremiumUsers = async (
       email: user.email,
       mobileNumber: user.mobileNumber,
       profilePicture: user.profilePicture,
+      location: user.location || "",
       billingDate,
       plan: user.premiumPlan ? getPlanLabel(user.premiumPlan) : null,
     };

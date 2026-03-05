@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import pick from "../../../shared/pick";
 import sendResponse from "../../../shared/sendResponse";
+import ApiError from "../../../errors/ApiErrors";
 import { clientService } from "./client.service";
 
 const create = catchAsync(async (req: Request, res: Response) => {
@@ -58,10 +59,28 @@ const getHomePageData = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const search = catchAsync(async (req: Request, res: Response) => {
+  const name = (req.query.name as string) ?? "";
+  if (!name.trim()) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Query param 'name' is required",
+    );
+  }
+  const result = await clientService.searchClientByName(req.user.id, name);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Clients retrieved successfully!",
+    data: result,
+  });
+});
+
 export const clientController = {
   create,
   getAll,
   update,
   remove,
   getHomePageData,
+  search,
 };

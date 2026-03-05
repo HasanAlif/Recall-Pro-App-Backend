@@ -1,5 +1,6 @@
 import { Request } from "express";
 import httpStatus from "http-status";
+import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import { Client } from "./client.model";
 import { ClientVisit } from "../clientVisit/clientVisit.model";
@@ -217,10 +218,81 @@ const getHomePageData = async (userId: string) => {
   };
 };
 
+// Escape regex special characters to prevent ReDoS
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const searchClientByName = async (userId: string, name: string) => {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Search name cannot be empty");
+  }
+
+  const escaped = escapeRegex(trimmed);
+
+  const clients = await Client.aggregate([
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        fullName: { $regex: escaped, $options: "i" },
+      },
+    },
+    {
+      $addFields: {
+        score: {
+          $switch: {
+            branches: [
+              // Exact match (case-insensitive)
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$fullName",
+                    regex: `^${escaped}$`,
+                    options: "i",
+                  },
+                },
+                then: 3,
+              },
+              // Starts with
+              {
+                case: {
+                  $regexMatch: {
+                    input: "$fullName",
+                    regex: `^${escaped}`,
+                    options: "i",
+                  },
+                },
+                then: 2,
+              },
+            ],
+            // Contains anywhere
+            default: 1,
+          },
+        },
+      },
+    },
+    { $sort: { score: -1, fullName: 1 } },
+    { $limit: 50 },
+    {
+      $project: {
+        _id: 1,
+        fullName: 1,
+        phoneNumber: 1,
+        email: 1,
+        picture: 1,
+        notes: 1,
+        createdAt: 1,
+      },
+    },
+  ]);
+
+  return clients;
+};
+
 export const clientService = {
   createClient,
   getClients,
   updateClient,
   deleteClient,
   getHomePageData,
+  searchClientByName,
 };
