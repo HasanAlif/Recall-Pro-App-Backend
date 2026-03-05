@@ -339,7 +339,11 @@ const getMonthlyPremiumUsersGrowth = async (year: number) => {
   }));
 };
 
-const getAllUsers = async (status?: string) => {
+const getAllUsers = async (
+  status?: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
   type UserStatus = "Active" | "Inactive";
 
   let matchFilter: Record<string, unknown> = { isDeleted: false };
@@ -354,23 +358,30 @@ const getAllUsers = async (status?: string) => {
     ];
   }
 
-  const users = await User.aggregate<RecentUserResult>([
-    { $match: matchFilter },
-    { $sort: { createdAt: -1 } },
-    {
-      $project: {
-        _id: 0,
-        fullName: 1,
-        email: 1,
-        mobileNumber: 1,
-        profilePicture: 1,
-        createdAt: 1,
-        premiumPlan: 1,
+  const skip = (page - 1) * limit;
+
+  const [users, totalCount] = await Promise.all([
+    User.aggregate<RecentUserResult>([
+      { $match: matchFilter },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 0,
+          fullName: 1,
+          email: 1,
+          mobileNumber: 1,
+          profilePicture: 1,
+          createdAt: 1,
+          premiumPlan: 1,
+        },
       },
-    },
+    ]),
+    User.countDocuments(matchFilter),
   ]);
 
-  return users.map((user) => ({
+  const data = users.map((user) => ({
     fullName: user.fullName,
     email: user.email,
     mobileNumber: user.mobileNumber,
@@ -378,6 +389,16 @@ const getAllUsers = async (status?: string) => {
     Joined: formatJoinedDate(user.createdAt),
     status: getUserActivityStatus(user.premiumPlan) as UserStatus,
   }));
+
+  return {
+    meta: {
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+    },
+    data,
+  };
 };
 
 type PremiumUserResult = {
@@ -403,7 +424,11 @@ const YEARLY_PLANS: PremiumPlan[] = [
   PremiumPlan.PREMIUM_ANNUAL,
 ];
 
-const getPremiumUsers = async (plan?: string) => {
+const getPremiumUsers = async (
+  plan?: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
   let planFilter: PremiumPlan[];
 
   if (plan === "monthly") {
@@ -414,28 +439,35 @@ const getPremiumUsers = async (plan?: string) => {
     planFilter = PAID_PREMIUM_PLANS;
   }
 
-  const users = await User.aggregate<PremiumUserResult>([
-    {
-      $match: {
-        isDeleted: false,
-        premiumPlan: { $in: planFilter },
+  const matchFilter = {
+    isDeleted: false,
+    premiumPlan: { $in: planFilter },
+  };
+
+  const skip = (page - 1) * limit;
+
+  const [users, totalCount] = await Promise.all([
+    User.aggregate<PremiumUserResult>([
+      { $match: matchFilter },
+      { $sort: { premiumPlanExpiry: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 0,
+          fullName: 1,
+          email: 1,
+          mobileNumber: 1,
+          profilePicture: 1,
+          premiumPlan: 1,
+          premiumPlanExpiry: 1,
+        },
       },
-    },
-    { $sort: { premiumPlanExpiry: -1 } },
-    {
-      $project: {
-        _id: 0,
-        fullName: 1,
-        email: 1,
-        mobileNumber: 1,
-        profilePicture: 1,
-        premiumPlan: 1,
-        premiumPlanExpiry: 1,
-      },
-    },
+    ]),
+    User.countDocuments(matchFilter),
   ]);
 
-  return users.map((user) => {
+  const data = users.map((user) => {
     let billingDate: string | null = null;
 
     if (user.premiumPlan && user.premiumPlanExpiry) {
@@ -457,6 +489,16 @@ const getPremiumUsers = async (plan?: string) => {
       plan: user.premiumPlan ? getPlanLabel(user.premiumPlan) : null,
     };
   });
+
+  return {
+    meta: {
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+    },
+    data,
+  };
 };
 
 export const adminService = {

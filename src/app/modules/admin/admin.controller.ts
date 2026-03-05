@@ -105,7 +105,10 @@ const getAllUsers = catchAsync(async (req, res) => {
     );
   }
 
-  const result = await adminService.getAllUsers(status);
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+
+  const result = await adminService.getAllUsers(status, page, limit);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -129,7 +132,10 @@ const getPremiumUsers = catchAsync(async (req, res) => {
     );
   }
 
-  const result = await adminService.getPremiumUsers(plan);
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+
+  const result = await adminService.getPremiumUsers(plan, page, limit);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
