@@ -21,6 +21,12 @@ router.get(
   clientVisitController.getAllVisits,
 );
 
+router.get(
+  "/service-types",
+  auth(UserRole.USER),
+  clientVisitController.getServiceTypes,
+);
+
 router.get("/search", auth(UserRole.USER), clientVisitController.searchVisits);
 
 router.get("/", auth(UserRole.USER), clientVisitController.getAll);

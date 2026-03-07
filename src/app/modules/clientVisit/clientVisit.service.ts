@@ -56,6 +56,25 @@ const getCachedOrFreshSignedVideos = async (visit: any): Promise<string[]> => {
   return signed;
 };
 
+const getAllServiceTypesForUser = async (userId: string): Promise<string[]> => {
+  const clientIds = await Client.find({ userId }).distinct("_id");
+
+  const result = await ClientVisit.distinct("serviceType", {
+    clientId: { $in: clientIds },
+    serviceType: { $exists: true, $nin: [null, ""] },
+  });
+
+  const unique = new Set<string>();
+  for (const entry of result as string[]) {
+    for (const part of entry.split(",")) {
+      const trimmed = part.trim();
+      if (trimmed) unique.add(trimmed);
+    }
+  }
+
+  return Array.from(unique).sort();
+};
+
 const verifyClientOwnership = async (clientId: string, userId: string) => {
   const client = await Client.findOne({ _id: clientId, userId }).lean();
   if (!client) {
@@ -353,4 +372,5 @@ export const clientVisitService = {
   getVisitById,
   getAllVisits,
   searchVisitsByServiceType,
+  getAllServiceTypesForUser,
 };

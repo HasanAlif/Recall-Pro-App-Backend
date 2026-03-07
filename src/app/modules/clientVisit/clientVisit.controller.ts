@@ -85,10 +85,23 @@ const searchVisits = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getServiceTypes = catchAsync(async (req: Request, res: Response) => {
+  const result = await clientVisitService.getAllServiceTypesForUser(
+    req.user.id,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Service types retrieved successfully!",
+    data: result,
+  });
+});
+
 export const clientVisitController = {
   create,
   getAll,
   getById,
   getAllVisits,
   searchVisits,
+  getServiceTypes,
 };
