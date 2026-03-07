@@ -1,6 +1,6 @@
 import { Server } from "http";
 import config from "./config";
-import "./shared/database";
+import { connectMongoDB } from "./shared/database";
 import app from "./app";
 import scheduleExpiryCheck from "./utils/scheduleExpiryCheck";
 import scheduleVideoUrlRefresh from "./utils/refreshVideoSignedUrls";
@@ -8,6 +8,9 @@ import scheduleVideoUrlRefresh from "./utils/refreshVideoSignedUrls";
 let server: Server;
 
 async function startServer() {
+  // CONNECT DATABASE FIRST
+  await connectMongoDB();
+
   server = app.listen(config.port, () => {
     console.log(`Server is running on port ${config.port}`);
   });
@@ -18,6 +21,7 @@ async function startServer() {
 
 async function main() {
   await startServer();
+
   const exitHandler = () => {
     if (server) {
       server.close(() => {
@@ -44,7 +48,6 @@ async function main() {
     exitHandler();
   });
 
-  // Handling the server shutdown with SIGTERM and SIGINT
   process.on("SIGTERM", () => {
     console.log("SIGTERM signal received. Shutting down gracefully...");
     exitHandler();
