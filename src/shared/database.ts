@@ -9,8 +9,8 @@ dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
 async function connectMongoDB() {
   try {
     await mongoose.connect(config.database_url as string, {
-      serverSelectionTimeoutMS: 5000,
-      heartbeatFrequencyMS: 2000,
+      // serverSelectionTimeoutMS: 5000,
+      // heartbeatFrequencyMS: 2000,
     });
     console.log("MongoDB connected successfully!");
 
