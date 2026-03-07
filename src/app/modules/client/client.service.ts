@@ -25,6 +25,9 @@ const deleteFromCloudinary = (url: string | undefined) => {
   }
 };
 
+// Escape regex special characters to prevent ReDoS
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // Parse form-data body: handles both direct fields and JSON-wrapped "data" field
 const parseBody = (body: any) => {
   if (body?.data) {
@@ -72,30 +75,52 @@ const getClients = async (
   const { page, limit, skip, sortBy, sortOrder } =
     paginationHelper.calculatePagination(options);
 
-  const conditions: any[] = [{ userId }];
+  const conditions: any[] = [{ userId: new mongoose.Types.ObjectId(userId) }];
 
   if (params.searchTerm) {
+    const escaped = escapeRegex(params.searchTerm);
     conditions.push({
       $or: [
-        { fullName: { $regex: params.searchTerm, $options: "i" } },
-        { email: { $regex: params.searchTerm, $options: "i" } },
-        { phoneNumber: { $regex: params.searchTerm, $options: "i" } },
+        { fullName: { $regex: escaped, $options: "i" } },
+        { email: { $regex: escaped, $options: "i" } },
+        { phoneNumber: { $regex: escaped, $options: "i" } },
       ],
     });
   }
 
-  const whereConditions = { $and: conditions };
-
+  const matchStage = { $and: conditions };
   const sortConditions: Record<string, 1 | -1> = {};
   sortConditions[sortBy] = sortOrder === "desc" ? -1 : 1;
 
   const [data, total] = await Promise.all([
-    Client.find(whereConditions)
-      .sort(sortConditions)
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-    Client.countDocuments(whereConditions),
+    Client.aggregate([
+      { $match: matchStage },
+      { $sort: sortConditions },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: "clientvisits",
+          let: { clientId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$clientId", "$$clientId"] } } },
+            { $sort: { date: -1 } },
+            { $limit: 1 },
+            { $project: { serviceType: 1, _id: 0 } },
+          ],
+          as: "lastVisit",
+        },
+      },
+      {
+        $addFields: {
+          last: {
+            $ifNull: [{ $arrayElemAt: ["$lastVisit.serviceType", 0] }, ""],
+          },
+        },
+      },
+      { $project: { lastVisit: 0 } },
+    ]),
+    Client.countDocuments(matchStage),
   ]);
 
   return {
@@ -217,9 +242,6 @@ const getHomePageData = async (userId: string) => {
     recentlyViewed: recentVisits,
   };
 };
-
-// Escape regex special characters to prevent ReDoS
-const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const searchClientByName = async (userId: string, name: string) => {
   const trimmed = name.trim();

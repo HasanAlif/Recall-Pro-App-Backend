@@ -141,12 +141,12 @@ const revenueBreakDown = async (
     {
       $match: {
         clientId: { $in: clientIds },
-        createdAt: { $gte: startOfMonth, $lt: endOfMonth },
+        date: { $gte: startOfMonth, $lt: endOfMonth },
       },
     },
     {
       $group: {
-        _id: { $dayOfMonth: "$createdAt" },
+        _id: { $dayOfMonth: "$date" },
         service: { $sum: { $ifNull: ["$servicePrice", 0] } },
         tips: { $sum: { $ifNull: ["$tips", 0] } },
       },
