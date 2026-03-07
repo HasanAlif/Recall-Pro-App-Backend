@@ -10,6 +10,52 @@ import { fileUploader } from "../../../helpars/fileUploader";
 import { paginationHelper } from "../../../helpars/paginationHelper";
 import { IPaginationOptions } from "../../../interfaces/paginations";
 
+const isGCSUrl = (url: string): boolean => {
+  const bucket = process.env.GCS_BUCKET_NAME;
+  return (
+    !!bucket && url.startsWith(`https://storage.googleapis.com/${bucket}/`)
+  );
+};
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Returns signed video URLs for a visit, using the cached copy stored on the
+ * document when it is still valid (>1 day left). Otherwise generates fresh
+ * 7-day signed URLs and stores them in the background.
+ */
+const getCachedOrFreshSignedVideos = async (visit: any): Promise<string[]> => {
+  const rawVideos: string[] = (visit.videos || []) as string[];
+  if (!rawVideos.length || !rawVideos.some(isGCSUrl)) return rawVideos;
+
+  const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  if (
+    visit.signedVideos?.length === rawVideos.length &&
+    visit.videoUrlsExpiry &&
+    new Date(visit.videoUrlsExpiry) > oneDayFromNow
+  ) {
+    return visit.signedVideos as string[];
+  }
+
+  const signed = await Promise.all(
+    rawVideos.map((v) =>
+      isGCSUrl(v)
+        ? fileUploader.generateGCSSignedUrl(v, 10080)
+        : Promise.resolve(v),
+    ),
+  );
+
+  if (visit._id) {
+    ClientVisit.findByIdAndUpdate(visit._id, {
+      signedVideos: signed,
+      videoUrlsExpiry: new Date(Date.now() + SEVEN_DAYS_MS),
+    }).catch(() => {});
+  }
+
+  return signed;
+};
+
 const verifyClientOwnership = async (clientId: string, userId: string) => {
   const client = await Client.findOne({ _id: clientId, userId }).lean();
   if (!client) {
@@ -51,7 +97,11 @@ const createVisit = async (req: Request) => {
   }
 
   const result = await ClientVisit.create(visitData);
-  return result.toObject();
+  const obj = result.toObject();
+  if (obj.videos?.length) {
+    obj.videos = await getCachedOrFreshSignedVideos(obj);
+  }
+  return obj;
 };
 
 const getVisits = async (
@@ -133,8 +183,11 @@ const getVisitById = async (visitId: string, userId: string) => {
 
   await verifyClientOwnership(visit.clientId.toString(), userId);
 
+  const signedVideos = visit.videos?.length
+    ? await getCachedOrFreshSignedVideos(visit)
+    : visit.videos;
   return {
-    visit,
+    visit: { ...visit, videos: signedVideos },
     total: (visit.servicePrice ?? 0) + (visit.tips ?? 0),
   };
 };
@@ -172,12 +225,23 @@ const getAllVisits = async (
           serviceType: 1,
           photos: 1,
           videos: 1,
+          signedVideos: 1,
+          videoUrlsExpiry: 1,
           date: 1,
         },
       },
     ]),
     ClientVisit.countDocuments(matchFilter),
   ]);
+
+  const signedVisits = await Promise.all(
+    visits.map(async (v) => ({
+      ...v,
+      videos: v.videos?.length
+        ? await getCachedOrFreshSignedVideos(v)
+        : v.videos,
+    })),
+  );
 
   return {
     meta: {
@@ -186,7 +250,7 @@ const getAllVisits = async (
       totalCount,
       totalPages: Math.ceil(totalCount / limit),
     },
-    visits,
+    visits: signedVisits,
   };
 };
 
@@ -264,13 +328,23 @@ const searchVisitsByServiceType = async (
         serviceType: 1,
         photos: 1,
         videos: 1,
+        signedVideos: 1,
+        videoUrlsExpiry: 1,
         date: 1,
         clientName: { $ifNull: ["$client.fullName", ""] },
       },
     },
   ]);
 
-  return visits;
+  const signedVisits = await Promise.all(
+    visits.map(async (v) => ({
+      ...v,
+      videos: v.videos?.length
+        ? await getCachedOrFreshSignedVideos(v)
+        : v.videos,
+    })),
+  );
+  return signedVisits;
 };
 
 export const clientVisitService = {

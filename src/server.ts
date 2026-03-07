@@ -3,6 +3,7 @@ import config from "./config";
 import "./shared/database";
 import app from "./app";
 import scheduleExpiryCheck from "./utils/scheduleExpiryCheck";
+import scheduleVideoUrlRefresh from "./utils/refreshVideoSignedUrls";
 
 let server: Server;
 
@@ -12,6 +13,7 @@ async function startServer() {
   });
 
   scheduleExpiryCheck();
+  scheduleVideoUrlRefresh();
 }
 
 async function main() {

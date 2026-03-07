@@ -6,10 +6,7 @@ import { UserRole } from "../../models";
 
 const router = express.Router();
 
-const uploadPhotosAndVideos = fileUploader.upload.fields([
-  { name: "photos", maxCount: 15 },
-  { name: "videos", maxCount: 5 },
-]);
+const uploadPhotosAndVideos = fileUploader.uploadVisitFiles;
 
 router.post(
   "/",

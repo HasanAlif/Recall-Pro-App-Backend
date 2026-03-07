@@ -24,6 +24,24 @@ const gcsStorage = new Storage({
 });
 const gcsBucket = gcsStorage.bucket(process.env.GCS_BUCKET_NAME || "");
 
+const generateGCSSignedUrl = async (
+  filePathOrUrl: string,
+  expiresInMinutes: number = 10080, // 7 days
+): Promise<string> => {
+  const bucketName = process.env.GCS_BUCKET_NAME || "";
+  const prefix = `https://storage.googleapis.com/${bucketName}/`;
+  const filePath = filePathOrUrl.startsWith(prefix)
+    ? filePathOrUrl.slice(prefix.length)
+    : filePathOrUrl;
+
+  const [signedUrl] = await gcsBucket.file(filePath).getSignedUrl({
+    action: "read",
+    expires: Date.now() + expiresInMinutes * 60 * 1000,
+    version: "v4",
+  });
+  return signedUrl;
+};
+
 // Configure DigitalOcean Spaces
 const s3Client = new S3Client({
   region: "us-east-1",
@@ -204,16 +222,7 @@ const uploadVideoToGCS = async (
       reject(error);
     });
 
-    blobStream.on("finish", async () => {
-      // Make the file publicly accessible (optional — remove if using signed URLs)
-      try {
-        await blob.makePublic();
-      } catch (err) {
-        console.warn(
-          "Could not make file public. Bucket may have uniform access control.",
-        );
-      }
-
+    blobStream.on("finish", () => {
       const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${uniqueFileName}`;
       resolve({
         Location: publicUrl,
@@ -251,15 +260,7 @@ const uploadToGCS = async (
       reject(error);
     });
 
-    blobStream.on("finish", async () => {
-      try {
-        await blob.makePublic();
-      } catch (err) {
-        console.warn(
-          "Could not make file public. Bucket may have uniform access control.",
-        );
-      }
-
+    blobStream.on("finish", () => {
       const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${uniqueFileName}`;
       resolve({
         Location: publicUrl,
@@ -313,6 +314,15 @@ const uploadMultipleVideos = multer({
   },
 }).fields([{ name: "videos", maxCount: 5 }]);
 
+// Multer for visit uploads: photos (≤10 MB each handled downstream) + videos (≤200 MB)
+const uploadVisitFiles = multer({
+  storage,
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB — accommodates videos
+}).fields([
+  { name: "photos", maxCount: 15 },
+  { name: "videos", maxCount: 5 },
+]);
+
 // ✅ No Name Changes, Just Fixes
 export const fileUploader = {
   upload,
@@ -330,4 +340,6 @@ export const fileUploader = {
   uploadToGCS,
   uploadVideo,
   uploadMultipleVideos,
+  uploadVisitFiles,
+  generateGCSSignedUrl,
 };

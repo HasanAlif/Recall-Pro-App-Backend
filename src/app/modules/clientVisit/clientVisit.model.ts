@@ -6,6 +6,8 @@ export interface IClientVisit extends Document {
   serviceType?: string;
   photos?: string[];
   videos?: string[];
+  signedVideos?: string[];
+  videoUrlsExpiry?: Date;
   serviceNotes?: string;
   personalNotes?: string;
   duration?: number;
@@ -35,6 +37,13 @@ const ClientVisitSchema = new Schema<IClientVisit>(
     videos: {
       type: [String],
       default: [],
+    },
+    signedVideos: {
+      type: [String],
+      default: [],
+    },
+    videoUrlsExpiry: {
+      type: Date,
     },
     serviceNotes: {
       type: String,
