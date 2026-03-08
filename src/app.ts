@@ -13,6 +13,7 @@ export const corsOptions = {
     "http://localhost:3001",
     "http://localhost:3000",
     "http://localhost:5173",
+    "https://dashboard.recallproapp.com",
   ],
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
