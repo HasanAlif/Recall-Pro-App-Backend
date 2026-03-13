@@ -321,6 +321,7 @@ const googleCallback = async (code: string) => {
         googleId,
         profilePicture: picture,
         authProvider: AuthProvider.GOOGLE,
+        isVerified: true,
       });
       user = await User.findById(newUser._id).lean();
     }

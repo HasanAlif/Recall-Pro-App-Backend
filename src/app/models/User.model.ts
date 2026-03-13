@@ -30,8 +30,8 @@ export interface IUser extends Document {
   _id: string;
   fullName: string;
   email: string;
-  mobileNumber: string;
-  password: string;
+  mobileNumber?: string;
+  password?: string;
   profilePicture?: string;
   location?: string;
   role: UserRole;
@@ -71,7 +71,7 @@ const UserSchema = new Schema<IUser>(
     },
     mobileNumber: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     location: {
@@ -81,7 +81,7 @@ const UserSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
       select: false,
     },
     profilePicture: {
