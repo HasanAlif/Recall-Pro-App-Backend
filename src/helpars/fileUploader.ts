@@ -323,7 +323,29 @@ const uploadVisitFiles = multer({
   { name: "videos", maxCount: 5 },
 ]);
 
-// ✅ No Name Changes, Just Fixes
+// Delete a single file from Cloudinary by its URL (fire-and-forget)
+const deleteFromCloudinary = (url: string | undefined): void => {
+  if (!url) return;
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+  const publicId = match ? match[1] : null;
+  if (publicId) {
+    cloudinary.uploader.destroy(publicId).catch(() => {});
+  }
+};
+
+// Delete a single file from Google Cloud Storage by its URL (fire-and-forget)
+const deleteFromGCS = (url: string | undefined): void => {
+  if (!url) return;
+  const bucketName = process.env.GCS_BUCKET_NAME || "";
+  const prefix = `https://storage.googleapis.com/${bucketName}/`;
+  if (!url.startsWith(prefix)) return;
+  const filePath = url.slice(prefix.length);
+  gcsBucket
+    .file(filePath)
+    .delete()
+    .catch(() => {});
+};
+
 export const fileUploader = {
   upload,
   uploadSingle,
@@ -342,4 +364,6 @@ export const fileUploader = {
   uploadMultipleVideos,
   uploadVisitFiles,
   generateGCSSignedUrl,
+  deleteFromCloudinary,
+  deleteFromGCS,
 };

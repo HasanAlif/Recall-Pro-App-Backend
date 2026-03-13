@@ -1,7 +1,6 @@
 import { Request } from "express";
 import httpStatus from "http-status";
 import mongoose from "mongoose";
-import { v2 as cloudinary } from "cloudinary";
 import { ClientVisit } from "./clientVisit.model";
 import { Client } from "../client/client.model";
 import { clientVisitValidation } from "./clientVisit.validation";
@@ -211,6 +210,82 @@ const getVisitById = async (visitId: string, userId: string) => {
   };
 };
 
+const updateVisitById = async (req: Request) => {
+  const userId = req.user.id;
+  const visitId = req.params.id;
+  const validatedData = clientVisitValidation.updateSchema.parse(req.body);
+
+  const existingVisit = await ClientVisit.findById(visitId);
+  if (!existingVisit) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Visit not found");
+  }
+  await verifyClientOwnership(existingVisit.clientId.toString(), userId);
+
+  const updateData: Record<string, any> = { ...validatedData };
+
+  const files = req.files as
+    | { photos?: Express.Multer.File[]; videos?: Express.Multer.File[] }
+    | undefined;
+
+  // Handle photo replacement: upload new first, then delete old
+  if (files?.photos && files.photos.length > 0) {
+    const photoResults = await Promise.all(
+      files.photos.map((file) =>
+        fileUploader.uploadToCloudinary(file, "visit-photos"),
+      ),
+    );
+    updateData.photos = photoResults.map((r) => r.Location);
+
+    for (const oldUrl of existingVisit.photos || []) {
+      fileUploader.deleteFromCloudinary(oldUrl);
+    }
+  }
+
+  // Handle video replacement: upload new first, then delete old
+  if (files?.videos && files.videos.length > 0) {
+    const videoResults = await Promise.all(
+      files.videos.map((file) =>
+        fileUploader.uploadVideoToGCS(file, "visit-videos"),
+      ),
+    );
+    updateData.videos = videoResults.map((r) => r.Location);
+    updateData.signedVideos = [];
+    updateData.videoUrlsExpiry = null;
+
+    for (const oldUrl of existingVisit.videos || []) {
+      fileUploader.deleteFromGCS(oldUrl);
+    }
+  }
+
+  const result = await ClientVisit.findByIdAndUpdate(visitId, updateData, {
+    new: true,
+  }).lean();
+
+  if (result && result.videos?.length) {
+    result.videos = await getCachedOrFreshSignedVideos(result);
+  }
+
+  return result;
+};
+
+const deleteVisitById = async (visitId: string, userId: string) => {
+  const visit = await ClientVisit.findById(visitId);
+  if (!visit) {
+    throw new ApiError(httpStatus.NOT_FOUND, "Visit not found");
+  }
+  await verifyClientOwnership(visit.clientId.toString(), userId);
+
+  for (const photoUrl of visit.photos || []) {
+    fileUploader.deleteFromCloudinary(photoUrl);
+  }
+  for (const videoUrl of visit.videos || []) {
+    fileUploader.deleteFromGCS(videoUrl);
+  }
+
+  await ClientVisit.findByIdAndDelete(visitId);
+  return null;
+};
+
 const getAllVisits = async (
   userId: string,
   page: number = 1,
@@ -370,6 +445,8 @@ export const clientVisitService = {
   createVisit,
   getVisits,
   getVisitById,
+  updateVisitById,
+  deleteVisitById,
   getAllVisits,
   searchVisitsByServiceType,
   getAllServiceTypesForUser,

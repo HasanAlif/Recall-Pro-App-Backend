@@ -33,4 +33,13 @@ router.get("/", auth(UserRole.USER), clientVisitController.getAll);
 
 router.get("/:id", auth(UserRole.USER), clientVisitController.getById);
 
+router.patch(
+  "/:id",
+  auth(UserRole.USER),
+  uploadPhotosAndVideos,
+  clientVisitController.update,
+);
+
+router.delete("/:id", auth(UserRole.USER), clientVisitController.remove);
+
 export const clientVisitRoutes = router;

@@ -97,10 +97,32 @@ const getServiceTypes = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const update = catchAsync(async (req: Request, res: Response) => {
+  const result = await clientVisitService.updateVisitById(req);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Visit updated successfully!",
+    data: result,
+  });
+});
+
+const remove = catchAsync(async (req: Request, res: Response) => {
+  await clientVisitService.deleteVisitById(req.params.id, req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Visit deleted successfully!",
+    data: null,
+  });
+});
+
 export const clientVisitController = {
   create,
   getAll,
   getById,
+  update,
+  remove,
   getAllVisits,
   searchVisits,
   getServiceTypes,
