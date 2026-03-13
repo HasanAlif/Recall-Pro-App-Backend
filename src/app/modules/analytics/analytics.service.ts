@@ -1,10 +1,12 @@
-import mongoose from "mongoose";
-import ApiError from "../../../errors/ApiErrors";
-import httpStatus from "http-status";
 import { Client } from "../client/client.model";
 import { ClientVisit } from "../clientVisit/clientVisit.model";
 
-const getAnalyticsData = async (userId: string) => {
+type EarningFilter = "today" | "7-days" | "30-days" | "all-time";
+
+const getAnalyticsData = async (
+  userId: string,
+  filter: EarningFilter = "today",
+) => {
   // Get all client IDs belonging to this user
   const clientIds = await Client.find({ userId }).distinct("_id");
 
@@ -28,15 +30,28 @@ const getAnalyticsData = async (userId: string) => {
 
   const matchClients = { clientId: { $in: clientIds } };
 
-  const [todayAgg, thisWeekAgg, prevWeekAgg] = await Promise.all([
-    // Today's earnings
+  // Compute earning start date based on filter
+  let earningStartDate: Date | null = null;
+  if (filter === "today") {
+    earningStartDate = startOfToday;
+  } else if (filter === "7-days") {
+    earningStartDate = new Date(startOfToday);
+    earningStartDate.setDate(earningStartDate.getDate() - 6);
+  } else if (filter === "30-days") {
+    earningStartDate = new Date(startOfToday);
+    earningStartDate.setDate(earningStartDate.getDate() - 29);
+  }
+  // all-time: earningStartDate stays null (no date filter)
+
+  const earningMatch: Record<string, any> = { ...matchClients };
+  if (earningStartDate) {
+    earningMatch.createdAt = { $gte: earningStartDate, $lt: endOfToday };
+  }
+
+  const [earningAgg, thisWeekAgg, prevWeekAgg] = await Promise.all([
+    // Earnings based on filter
     ClientVisit.aggregate([
-      {
-        $match: {
-          ...matchClients,
-          createdAt: { $gte: startOfToday, $lt: endOfToday },
-        },
-      },
+      { $match: earningMatch },
       {
         $group: {
           _id: null,
@@ -79,10 +94,10 @@ const getAnalyticsData = async (userId: string) => {
     ]),
   ]);
 
-  // Today
-  const todayService = todayAgg[0]?.service ?? 0;
-  const todayTips = todayAgg[0]?.tips ?? 0;
-  const todayTotal = todayService + todayTips;
+  // Earning (filtered)
+  const earningService = earningAgg[0]?.service ?? 0;
+  const earningTips = earningAgg[0]?.tips ?? 0;
+  const earningTotal = earningService + earningTips;
 
   // This week
   const thisWeekService = thisWeekAgg[0]?.service ?? 0;
@@ -109,10 +124,10 @@ const getAnalyticsData = async (userId: string) => {
     thisWeekTotal > 0 ? Math.round((thisWeekTips / thisWeekTotal) * 100) : 0;
 
   return {
-    todaysEarning: {
-      total: todayTotal,
-      service: todayService,
-      tips: todayTips,
+    Earning: {
+      total: earningTotal,
+      service: earningService,
+      tips: earningTips,
     },
     thisWeek: {
       totalEarning: thisWeekTotal,

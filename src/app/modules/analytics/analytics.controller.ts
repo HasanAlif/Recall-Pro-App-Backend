@@ -4,8 +4,14 @@ import sendResponse from "../../../shared/sendResponse";
 import catchAsync from "../../../shared/catchAsync";
 import { analyticsService } from "./analytics.service";
 
+const VALID_FILTERS = ["today", "7-days", "30-days", "all-time"] as const;
+
 const getAnalytics = catchAsync(async (req: Request, res: Response) => {
-  const result = await analyticsService.getAnalyticsData(req.user.id);
+  const raw = (req.query.filter as string) || "today";
+  const filter = VALID_FILTERS.includes(raw as any)
+    ? (raw as (typeof VALID_FILTERS)[number])
+    : "today";
+  const result = await analyticsService.getAnalyticsData(req.user.id, filter);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
