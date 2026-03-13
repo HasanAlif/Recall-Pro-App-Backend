@@ -200,13 +200,13 @@ const getVisitById = async (visitId: string, userId: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Visit not found");
   }
 
-  await verifyClientOwnership(visit.clientId.toString(), userId);
+  const client = await verifyClientOwnership(visit.clientId.toString(), userId);
 
   const signedVideos = visit.videos?.length
     ? await getCachedOrFreshSignedVideos(visit)
     : visit.videos;
   return {
-    visit: { ...visit, videos: signedVideos },
+    visit: { ...visit, videos: signedVideos, visitorName: client.fullName },
     total: (visit.servicePrice ?? 0) + (visit.tips ?? 0),
   };
 };
