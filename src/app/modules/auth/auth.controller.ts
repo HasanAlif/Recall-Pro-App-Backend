@@ -132,29 +132,36 @@ const getGoogleAuthUrl = catchAsync(async (req: Request, res: Response) => {
 });
 
 // Google OAuth Callback
-const googleCallback = catchAsync(async (req: Request, res: Response) => {
-  const { code } = req.query;
+const googleCallback = async (req: Request, res: Response) => {
+  try {
+    const { code } = req.query;
 
-  if (!code || typeof code !== "string") {
-    return res.redirect(
-      `${config.frontendUrl}/auth/error?message=Invalid authorization code`,
+    if (!code || typeof code !== "string") {
+      return res.redirect(
+        `${config.frontendUrl}/auth/error?message=${encodeURIComponent("Invalid authorization code")}`,
+      );
+    }
+
+    const result = await authService.googleCallback(code);
+
+    // Set cookie
+    res.cookie("token", result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+
+    // Redirect to frontend with token
+    res.redirect(`${config.frontendUrl}/auth/callback?token=${result.token}`);
+  } catch (error: any) {
+    const message = error?.message || "Google authentication failed";
+    res.redirect(
+      `${config.frontendUrl}/auth/error?message=${encodeURIComponent(message)}`,
     );
   }
-
-  const result = await authService.googleCallback(code);
-
-  // Set cookie
-  res.cookie("token", result.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: "/",
-  });
-
-  // Redirect to frontend with token
-  res.redirect(`${config.frontendUrl}/auth/callback?token=${result.token}`);
-});
+};
 
 export const AuthController = {
   loginUser,
