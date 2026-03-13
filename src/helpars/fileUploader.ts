@@ -24,15 +24,47 @@ const gcsStorage = new Storage({
 });
 const gcsBucket = gcsStorage.bucket(process.env.GCS_BUCKET_NAME || "");
 
+// Extract the GCS file path from a public or signed URL
+const extractGCSFilePath = (filePathOrUrl: string): string => {
+  const bucketName = process.env.GCS_BUCKET_NAME || "";
+  const prefix = `https://storage.googleapis.com/${bucketName}/`;
+  let filePath = filePathOrUrl.startsWith(prefix)
+    ? filePathOrUrl.slice(prefix.length)
+    : filePathOrUrl;
+
+  // Strip query params (handles signed URLs fed back in)
+  const queryIndex = filePath.indexOf("?");
+  if (queryIndex !== -1) {
+    filePath = filePath.substring(0, queryIndex);
+  }
+
+  return decodeURIComponent(filePath);
+};
+
 const generateGCSSignedUrl = async (
   filePathOrUrl: string,
   expiresInMinutes: number = 10080, // 7 days
 ): Promise<string> => {
-  const bucketName = process.env.GCS_BUCKET_NAME || "";
-  const prefix = `https://storage.googleapis.com/${bucketName}/`;
-  const filePath = filePathOrUrl.startsWith(prefix)
-    ? filePathOrUrl.slice(prefix.length)
-    : filePathOrUrl;
+  const filePath = extractGCSFilePath(filePathOrUrl);
+
+  const [signedUrl] = await gcsBucket.file(filePath).getSignedUrl({
+    action: "read",
+    expires: Date.now() + expiresInMinutes * 60 * 1000,
+    version: "v4",
+  });
+  return signedUrl;
+};
+
+// Like generateGCSSignedUrl but checks if the file exists first.
+// Returns null if the file is not found in GCS. Use in background jobs.
+const refreshGCSSignedUrl = async (
+  filePathOrUrl: string,
+  expiresInMinutes: number = 10080,
+): Promise<string | null> => {
+  const filePath = extractGCSFilePath(filePathOrUrl);
+
+  const [exists] = await gcsBucket.file(filePath).exists();
+  if (!exists) return null;
 
   const [signedUrl] = await gcsBucket.file(filePath).getSignedUrl({
     action: "read",
@@ -366,4 +398,5 @@ export const fileUploader = {
   generateGCSSignedUrl,
   deleteFromCloudinary,
   deleteFromGCS,
+  refreshGCSSignedUrl,
 };

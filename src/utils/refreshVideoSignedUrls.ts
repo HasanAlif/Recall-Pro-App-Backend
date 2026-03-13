@@ -39,11 +39,22 @@ const refreshVideoSignedUrls = async (): Promise<void> => {
 
     try {
       const signed = await Promise.all(
-        visit.videos.map((v) =>
-          isGCSUrl(v)
-            ? fileUploader.generateGCSSignedUrl(v, 10080)
-            : Promise.resolve(v),
-        ),
+        visit.videos.map(async (v) => {
+          if (!isGCSUrl(v)) return v;
+          try {
+            const url = await fileUploader.refreshGCSSignedUrl(v, 10080);
+            if (!url) {
+              console.warn(
+                `[VideoRefresh] File not found in GCS, skipping: ${v}`,
+              );
+              return v;
+            }
+            return url;
+          } catch (err: any) {
+            console.warn(`[VideoRefresh] Failed to sign ${v}: ${err?.message}`);
+            return v;
+          }
+        }),
       );
 
       await ClientVisit.findByIdAndUpdate(visit._id, {

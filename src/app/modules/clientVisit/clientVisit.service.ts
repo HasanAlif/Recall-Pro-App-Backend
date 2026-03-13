@@ -38,11 +38,14 @@ const getCachedOrFreshSignedVideos = async (visit: any): Promise<string[]> => {
   }
 
   const signed = await Promise.all(
-    rawVideos.map((v) =>
-      isGCSUrl(v)
-        ? fileUploader.generateGCSSignedUrl(v, 10080)
-        : Promise.resolve(v),
-    ),
+    rawVideos.map(async (v) => {
+      if (!isGCSUrl(v)) return v;
+      try {
+        return await fileUploader.generateGCSSignedUrl(v, 10080);
+      } catch {
+        return v;
+      }
+    }),
   );
 
   if (visit._id) {
