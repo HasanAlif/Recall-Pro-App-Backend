@@ -75,7 +75,7 @@ const getAnalyticsData = async (
       {
         $match: {
           ...matchClients,
-          createdAt: { $gte: currentStart, $lt: endOfToday },
+          date: { $gte: currentStart, $lt: endOfToday },
         },
       },
       groupStage,
@@ -84,7 +84,7 @@ const getAnalyticsData = async (
       {
         $match: {
           ...matchClients,
-          createdAt: { $gte: prevStart, $lt: currentStart },
+          date: { $gte: prevStart, $lt: currentStart },
         },
       },
       groupStage,
