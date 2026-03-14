@@ -7,8 +7,8 @@ const getAnalyticsData = async (
   userId: string,
   filter: EarningFilter = "today",
 ) => {
-  // Get all client IDs belonging to this user
   const clientIds = await Client.find({ userId }).distinct("_id");
+  const matchClients = { clientId: { $in: clientIds } };
 
   // Date boundaries
   const now = new Date();
@@ -20,38 +20,23 @@ const getAnalyticsData = async (
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
 
-  // This week: last 7 days
-  const startOfThisWeek = new Date(startOfToday);
-  startOfThisWeek.setDate(startOfThisWeek.getDate() - 6); // includes today = 7 days
+  // Compute current and previous period boundaries based on filter
+  // today        → current: today,       previous: yesterday
+  // 7-days       → current: last 7 days, previous: the 7 days before that
+  // 30-days      → current: last 30 days,previous: the 30 days before that
+  // all-time     → no comparison, only Earning
+  const periodDays: Record<string, number> = {
+    today: 1,
+    "7-days": 7,
+    "30-days": 30,
+  };
 
-  // Previous week: the 7 days before this week
-  const startOfPrevWeek = new Date(startOfThisWeek);
-  startOfPrevWeek.setDate(startOfPrevWeek.getDate() - 7);
+  const days = periodDays[filter]; // undefined for all-time
 
-  const matchClients = { clientId: { $in: clientIds } };
-
-  // Compute earning start date based on filter
-  let earningStartDate: Date | null = null;
-  if (filter === "today") {
-    earningStartDate = startOfToday;
-  } else if (filter === "7-days") {
-    earningStartDate = new Date(startOfToday);
-    earningStartDate.setDate(earningStartDate.getDate() - 6);
-  } else if (filter === "30-days") {
-    earningStartDate = new Date(startOfToday);
-    earningStartDate.setDate(earningStartDate.getDate() - 29);
-  }
-  // all-time: earningStartDate stays null (no date filter)
-
-  const earningMatch: Record<string, any> = { ...matchClients };
-  if (earningStartDate) {
-    earningMatch.createdAt = { $gte: earningStartDate, $lt: endOfToday };
-  }
-
-  const [earningAgg, thisWeekAgg, prevWeekAgg] = await Promise.all([
-    // Earnings based on filter
-    ClientVisit.aggregate([
-      { $match: earningMatch },
+  // For all-time: single aggregation, no date filter
+  if (!days) {
+    const [allTimeAgg] = await ClientVisit.aggregate([
+      { $match: matchClients },
       {
         $group: {
           _id: null,
@@ -59,82 +44,85 @@ const getAnalyticsData = async (
           tips: { $sum: { $ifNull: ["$tips", 0] } },
         },
       },
-    ]),
-    // This week's earnings (last 7 days)
+    ]);
+
+    const service = allTimeAgg?.service ?? 0;
+    const tips = allTimeAgg?.tips ?? 0;
+
+    return {
+      Earning: { total: service + tips, service, tips },
+    };
+  }
+
+  // Current period: [currentStart, endOfToday)
+  const currentStart = new Date(startOfToday);
+  currentStart.setDate(currentStart.getDate() - (days - 1));
+
+  // Previous period: [prevStart, currentStart)
+  const prevStart = new Date(currentStart);
+  prevStart.setDate(prevStart.getDate() - days);
+
+  const groupStage = {
+    $group: {
+      _id: null,
+      service: { $sum: { $ifNull: ["$servicePrice", 0] } },
+      tips: { $sum: { $ifNull: ["$tips", 0] } },
+    },
+  };
+
+  const [currentAgg, prevAgg] = await Promise.all([
     ClientVisit.aggregate([
       {
         $match: {
           ...matchClients,
-          createdAt: { $gte: startOfThisWeek, $lt: endOfToday },
+          createdAt: { $gte: currentStart, $lt: endOfToday },
         },
       },
-      {
-        $group: {
-          _id: null,
-          service: { $sum: { $ifNull: ["$servicePrice", 0] } },
-          tips: { $sum: { $ifNull: ["$tips", 0] } },
-        },
-      },
+      groupStage,
     ]),
-    // Previous week's earnings (7 days before this week)
     ClientVisit.aggregate([
       {
         $match: {
           ...matchClients,
-          createdAt: { $gte: startOfPrevWeek, $lt: startOfThisWeek },
+          createdAt: { $gte: prevStart, $lt: currentStart },
         },
       },
-      {
-        $group: {
-          _id: null,
-          service: { $sum: { $ifNull: ["$servicePrice", 0] } },
-          tips: { $sum: { $ifNull: ["$tips", 0] } },
-        },
-      },
+      groupStage,
     ]),
   ]);
 
-  // Earning (filtered)
-  const earningService = earningAgg[0]?.service ?? 0;
-  const earningTips = earningAgg[0]?.tips ?? 0;
-  const earningTotal = earningService + earningTips;
+  const currentService = currentAgg[0]?.service ?? 0;
+  const currentTips = currentAgg[0]?.tips ?? 0;
+  const currentTotal = currentService + currentTips;
 
-  // This week
-  const thisWeekService = thisWeekAgg[0]?.service ?? 0;
-  const thisWeekTips = thisWeekAgg[0]?.tips ?? 0;
-  const thisWeekTotal = thisWeekService + thisWeekTips;
+  const prevTotal = (prevAgg[0]?.service ?? 0) + (prevAgg[0]?.tips ?? 0);
 
-  // Previous week
-  const prevWeekService = prevWeekAgg[0]?.service ?? 0;
-  const prevWeekTips = prevWeekAgg[0]?.tips ?? 0;
-  const prevWeekTotal = prevWeekService + prevWeekTips;
-
-  // Growth percentage compared to previous week
+  // Growth percentage: current period vs previous period
   let growthPercentage = 0;
-  if (prevWeekTotal > 0) {
+  if (prevTotal > 0) {
     growthPercentage = Math.round(
-      ((thisWeekTotal - prevWeekTotal) / prevWeekTotal) * 100,
+      ((currentTotal - prevTotal) / prevTotal) * 100,
     );
-  } else if (thisWeekTotal > 0) {
+  } else if (currentTotal > 0) {
     growthPercentage = 100;
   }
 
-  // Tips percentage compared to this week's total earning
+  // Tips percentage relative to current period total earning
   const tipsPercentageComparetotalEarning =
-    thisWeekTotal > 0 ? Math.round((thisWeekTips / thisWeekTotal) * 100) : 0;
+    currentTotal > 0 ? Math.round((currentTips / currentTotal) * 100) : 0;
 
   return {
     Earning: {
-      total: earningTotal,
-      service: earningService,
-      tips: earningTips,
+      total: currentTotal,
+      service: currentService,
+      tips: currentTips,
     },
     thisWeek: {
-      totalEarning: thisWeekTotal,
+      totalEarning: currentTotal,
       growthPercentage,
     },
     tips: {
-      totalTips: thisWeekTips,
+      totalTips: currentTips,
       tipsPercentageComparetotalEarning,
     },
   };
