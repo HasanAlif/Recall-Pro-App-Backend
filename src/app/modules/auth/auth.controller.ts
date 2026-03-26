@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
-import config from "../../../config";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { authService } from "./auth.service";
@@ -120,48 +119,25 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Get Google Auth URL
-const getGoogleAuthUrl = catchAsync(async (req: Request, res: Response) => {
-  const result = authService.getGoogleAuthUrl();
+// Social Login (Google)
+const socialLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await authService.socialLogin(req);
+
+  res.cookie("token", result.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Google auth URL generated",
+    message: "Login successful",
     data: result,
   });
 });
-
-// Google OAuth Callback
-const googleCallback = async (req: Request, res: Response) => {
-  try {
-    const { code } = req.query;
-
-    if (!code || typeof code !== "string") {
-      return res.redirect(
-        `${config.frontendUrl}/auth/error?message=${encodeURIComponent("Invalid authorization code")}`,
-      );
-    }
-
-    const result = await authService.googleCallback(code);
-
-    // Set cookie
-    res.cookie("token", result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
-
-    // Redirect to frontend with token
-    res.redirect(`${config.frontendUrl}/auth/callback?token=${result.token}`);
-  } catch (error: any) {
-    const message = error?.message || "Google authentication failed";
-    res.redirect(
-      `${config.frontendUrl}/auth/error?message=${encodeURIComponent(message)}`,
-    );
-  }
-};
 
 export const AuthController = {
   loginUser,
@@ -172,6 +148,5 @@ export const AuthController = {
   resetPassword,
   resendOtp,
   verifyForgotPasswordOtp,
-  getGoogleAuthUrl,
-  googleCallback,
+  socialLogin,
 };

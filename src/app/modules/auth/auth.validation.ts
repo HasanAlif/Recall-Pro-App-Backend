@@ -30,10 +30,19 @@ const resendOtpSchema = z.object({
   email: z.string().email("Please provide a valid email"),
 });
 
+const socialLoginValidationSchema = z.object({
+  email: z.string().email("Please provide a valid email"),
+  name: z.string().min(1, "Name is required"),
+  provider: z.enum(["GOOGLE"], { message: "Provider must be GOOGLE" }),
+  providerId: z.string().min(1, "Provider ID is required"),
+  profileImage: z.string().optional().nullable(),
+});
+
 export const authValidation = {
   changePasswordValidationSchema,
   forgotPasswordSchema,
   verifyOtpSchema,
   resetPasswordValidationSchema,
   resendOtpSchema,
+  socialLoginValidationSchema,
 };

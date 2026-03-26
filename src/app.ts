@@ -5,7 +5,6 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import GlobalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
-import { AuthController } from "./app/modules/auth/auth.controller";
 import { LANDING_PAGE_TEMPLATE } from "./utils/Template";
 
 const app: Application = express();
@@ -32,9 +31,6 @@ app.use(express.static("public"));
 app.get("/", (req: Request, res: Response) => {
   res.send(LANDING_PAGE_TEMPLATE);
 });
-
-// Google OAuth callback mounted at root level (Google redirects here directly)
-app.get("/auth/google/callback", AuthController.googleCallback);
 
 // Router setup
 app.use("/api", router);

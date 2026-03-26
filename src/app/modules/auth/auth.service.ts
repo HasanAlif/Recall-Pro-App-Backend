@@ -1,20 +1,14 @@
 import * as bcrypt from "bcrypt";
 import crypto from "crypto";
+import { Request } from "express";
 import httpStatus from "http-status";
-import { OAuth2Client } from "google-auth-library";
 import config from "../../../config";
 import ApiError from "../../../errors/ApiErrors";
 import { jwtHelpers } from "../../../helpars/jwtHelpers";
 import emailSender from "../../../shared/emailSender";
 import { PASSWORD_RESET_TEMPLATE } from "../../../utils/Template";
 import { AuthProvider, User } from "../../models";
-
-// Initialize Google OAuth client
-const googleClient = new OAuth2Client(
-  config.google.clientId,
-  config.google.clientSecret,
-  config.google.callbackUrl,
-);
+import { authValidation } from "./auth.validation";
 
 // User login
 const loginUser = async (payload: {
@@ -259,94 +253,42 @@ const resetPassword = async (
   return { message: "Password reset successfully" };
 };
 
-// Get Google OAuth URL
-const getGoogleAuthUrl = () => {
-  const scopes = [
-    "https://www.googleapis.com/auth/userinfo.profile",
-    "https://www.googleapis.com/auth/userinfo.email",
-  ];
+// Social Login (Google)
+const socialLogin = async (req: Request) => {
+  const providerId = req.body?.provider as string;
 
-  const authUrl = googleClient.generateAuthUrl({
-    access_type: "offline",
-    scope: scopes,
-    prompt: "consent",
-  });
-
-  return { authUrl };
-};
-
-// Handle Google OAuth callback
-const googleCallback = async (code: string) => {
-  // Exchange code for tokens
-  const { tokens } = await googleClient.getToken(code);
-  googleClient.setCredentials(tokens);
-
-  // Get user info from Google
-  const ticket = await googleClient.verifyIdToken({
-    idToken: tokens.id_token as string,
-    audience: config.google.clientId,
-  });
-
-  const payload = ticket.getPayload();
-
-  if (!payload || !payload.email) {
+  if (!providerId || !AuthProvider[providerId as keyof typeof AuthProvider]) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      "Failed to get user info from Google",
+      `${providerId} is not supported. Supported providers: ${Object.values(AuthProvider).join(", ")}`,
     );
   }
 
-  const { sub: googleId, email, name, picture } = payload;
+  const userData = await findOrCreateSocialUser(req);
 
-  // Check if user exists with this googleId
-  let user = await User.findOne({ googleId }).lean();
-
-  if (!user) {
-    // Check if user exists with this email (local account)
-    user = await User.findOne({ email }).lean();
-
-    if (user) {
-      // Link Google account to existing local account
-      await User.findByIdAndUpdate(user._id, {
-        googleId,
-        authProvider: AuthProvider.GOOGLE,
-        profilePicture: user.profilePicture || picture,
-      });
-      user = await User.findById(user._id).lean();
-    } else {
-      // Create new user with Google account
-      const newUser = await User.create({
-        fullName: name || "Google User",
-        email,
-        googleId,
-        profilePicture: picture,
-        authProvider: AuthProvider.GOOGLE,
-        isVerified: true,
-      });
-      user = await User.findById(newUser._id).lean();
-    }
+  if (!userData) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Failed to authenticate user");
   }
 
-  if (!user) {
+  if (userData.authProvider !== providerId) {
     throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Failed to create user",
+      httpStatus.BAD_REQUEST,
+      `This email is registered with ${userData.authProvider}. Please use ${userData.authProvider} to login.`,
     );
   }
 
-  if (user.status !== "ACTIVE") {
+  if (userData.status !== "ACTIVE") {
     throw new ApiError(
       httpStatus.FORBIDDEN,
       "Your account is inactive or blocked",
     );
   }
 
-  // Generate JWT token
   const accessToken = jwtHelpers.generateToken(
     {
-      id: user._id,
-      email: user.email,
-      role: user.role,
+      id: userData._id,
+      email: userData.email,
+      role: userData.role,
     },
     config.jwt.jwt_secret as string,
     config.jwt.expires_in as string,
@@ -357,9 +299,52 @@ const googleCallback = async (code: string) => {
     resetPasswordOtp,
     resetPasswordOtpExpiry,
     ...userWithoutSensitive
-  } = user as any;
+  } = userData;
 
   return { token: accessToken, user: userWithoutSensitive };
+};
+
+// Find or create user from social login data
+const findOrCreateSocialUser = async (req: Request) => {
+  const validation =
+    await authValidation.socialLoginValidationSchema.safeParseAsync(req.body);
+
+  if (!validation.success) {
+    const errorMessage = validation.error.errors
+      .map((err) => err.message)
+      .join(", ");
+    throw new ApiError(httpStatus.BAD_REQUEST, errorMessage);
+  }
+
+  const { email, name, provider, providerId, profileImage } = validation.data;
+
+  let userData = await User.findOne({ email }).lean();
+
+  if (!userData) {
+    // Create new user with social provider
+    const newUser = await User.create({
+      fullName: name,
+      email,
+      googleId: providerId,
+      ...(profileImage && { profilePicture: profileImage }),
+      authProvider: provider as AuthProvider,
+      isVerified: true,
+    });
+    userData = await User.findById(newUser._id).lean();
+  } else if (userData.authProvider === AuthProvider.GOOGLE) {
+    // Update Google ID if user already has GOOGLE provider
+    if (userData.googleId !== providerId) {
+      await User.findByIdAndUpdate(userData._id, {
+        googleId: providerId,
+        ...(profileImage &&
+          !userData.profilePicture && { profilePicture: profileImage }),
+      });
+      userData = await User.findById(userData._id).lean();
+    }
+  }
+  // If user exists with LOCAL provider, don't modify - let socialLogin handle the error
+
+  return userData;
 };
 
 export const authService = {
@@ -370,6 +355,5 @@ export const authService = {
   resendOtp,
   verifyForgotPasswordOtp,
   resetPassword,
-  getGoogleAuthUrl,
-  googleCallback,
+  socialLogin,
 };
